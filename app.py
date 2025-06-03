@@ -152,11 +152,14 @@ def document_list():
     c = conn.cursor()
 
     # ログイン中のユーザーの情報を取得
-    current_employee_id = st.session_state.get('employee_id')
-    employee_info = None
-    if current_employee_id:
-        c.execute("SELECT department, committee1, committee2, committee3, committee4, committee5 FROM employees WHERE employee_id = ?", (current_employee_id,))
-        employee_info = c.fetchone()
+    # ログイン機能がコメントアウトされているため、ダミーのemployee_idを使用するか、
+    # 全ての文書を表示するようにロジックを調整する必要があります。
+    # ここでは、ログイン状態に関わらず全ての文書を表示するように変更します。
+    # current_employee_id = st.session_state.get('employee_id')
+    # employee_info = None
+    # if current_employee_id:
+    #     c.execute("SELECT department, committee1, committee2, committee3, committee4, committee5 FROM employees WHERE employee_id = ?", (current_employee_id,))
+    #     employee_info = c.fetchone()
 
     # 全ての文書を取得
     c.execute("SELECT document_id, document_name, issuer, remarks FROM documents")
@@ -171,23 +174,23 @@ def document_list():
         for access_type, access_value in accesses:
             access_info.append(f"{access_type}:{access_value}")
 
-        # 閲覧権限のチェック
-        can_view = False
-        if not accesses: # 閲覧先が登録されていない文書は全員閲覧可能とする
-            can_view = True
-        elif employee_info:
-            # 職員番号別参照
-            if ('employee', current_employee_id) in accesses:
-                can_view = True
-            # 部署別参照
-            if employee_info[0] and ('department', employee_info[0]) in accesses:
-                can_view = True
-            # 委員会名等別参照
-            for i in range(1, 6):
-                if employee_info[i] and ('committee', employee_info[i]) in accesses:
-                    can_view = True
-        else: # ログインしていない場合は閲覧不可
-            can_view = False
+        # 閲覧権限のチェック (ログイン機能がコメントアウトされているため、常にTrueとします)
+        can_view = True
+        # if not accesses: # 閲覧先が登録されていない文書は全員閲覧可能とする
+        #     can_view = True
+        # elif employee_info:
+        #     # 職員番号別参照
+        #     if ('employee', current_employee_id) in accesses:
+        #         can_view = True
+        #     # 部署別参照
+        #     if employee_info[0] and ('department', employee_info[0]) in accesses:
+        #         can_view = True
+        #     # 委員会名等別参照
+        #     for i in range(1, 6):
+        #         if employee_info[i] and ('committee', employee_info[i]) in accesses:
+        #             can_view = True
+        # else: # ログインしていない場合は閲覧不可
+        #     can_view = False
 
         if can_view:
             document_details.append({
@@ -293,44 +296,49 @@ def main():
     st.sidebar.title("メニュー")
 
     if 'logged_in' not in st.session_state:
-        st.session_state['logged_in'] = False
+        # ログイン機能をコメントアウトするため、初期値をTrueに設定
+        st.session_state['logged_in'] = True
         st.session_state['show_access_registration'] = False
         st.session_state['access_list'] = []
+        # employee_idもダミーで設定するか、必要に応じてNoneにする
+        st.session_state['employee_id'] = "guest" # ログインなしで利用できるようにダミーIDを設定
 
-    if not st.session_state['logged_in']:
-        login()
-    else:
-        st.sidebar.write(f"ログイン中: {st.session_state['employee_id']}")
-        if st.sidebar.button("ログアウト"):
-            st.session_state['logged_in'] = False
-            st.session_state['employee_id'] = None
-            st.session_state['show_access_registration'] = False
-            st.session_state['access_list'] = []
-            st.success("ログアウトしました")
-            st.rerun()
+    # ログイン機能をコメントアウト
+    # if not st.session_state['logged_in']:
+    #     login()
+    # else:
+    st.sidebar.write(f"ログイン中: {st.session_state['employee_id']}") # 常に表示されるように変更
+    # ログアウトボタンもコメントアウト
+    # if st.sidebar.button("ログアウト"):
+    #     st.session_state['logged_in'] = False
+    #     st.session_state['employee_id'] = None
+    #     st.session_state['show_access_registration'] = False
+    #     st.session_state['access_list'] = []
+    #     st.success("ログアウトしました")
+    #     st.rerun()
 
-        menu_options = [
-            "文書登録",
-            "文書一覧",
-            "社員登録",
-            "社員一覧",
-            "委員会等登録",
-            "委員会等一覧"
-        ]
-        choice = st.sidebar.radio("機能を選択", menu_options)
+    menu_options = [
+        "文書登録",
+        "文書一覧",
+        "社員登録",
+        "社員一覧",
+        "委員会等登録",
+        "委員会等一覧"
+    ]
+    choice = st.sidebar.radio("機能を選択", menu_options)
 
-        if choice == "文書登録":
-            document_registration()
-        elif choice == "文書一覧":
-            document_list()
-        elif choice == "社員登録":
-            employee_registration()
-        elif choice == "社員一覧":
-            employee_list()
-        elif choice == "委員会等登録":
-            committee_registration()
-        elif choice == "委員会等一覧":
-            committee_list()
+    if choice == "文書登録":
+        document_registration()
+    elif choice == "文書一覧":
+        document_list()
+    elif choice == "社員登録":
+        employee_registration()
+    elif choice == "社員一覧":
+        employee_list()
+    elif choice == "委員会等登録":
+        committee_registration()
+    elif choice == "委員会等一覧":
+        committee_list()
 
 if __name__ == "__main__":
     main()
