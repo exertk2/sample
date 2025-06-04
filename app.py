@@ -515,60 +515,104 @@ def main():
 
     # セッションステートの初期化
     if 'logged_in' not in st.session_state:
-        st.session_state['logged_in'] = True # ログイン機能をコメントアウトしているため常にTrue
-        st.session_state['employee_id'] = "guest" # ログインなしで利用できるようにダミーIDを設定
+        st.session_state['logged_in'] = False # 初期状態は未ログイン
+        st.session_state['employee_id'] = None
         st.session_state['show_access_registration'] = False
         st.session_state['access_list'] = []
         st.session_state['current_document_id'] = None
         st.session_state['current_document_name'] = None
         st.session_state['editing_document_id'] = None # 編集中の文書ID
         st.session_state['selected_doc_for_view'] = None # 閲覧ボタンで選択された文書ID
+        st.session_state['current_page'] = "ログイン" # 初期表示ページをログイン画面に設定
 
-    # 現在のページを管理するセッションステート
-    if 'current_page' not in st.session_state:
-        st.session_state['current_page'] = "文書一覧" # 初期表示ページ
+    # ログイン画面
+    if not st.session_state['logged_in']:
+        st.title("文書管理システム ログイン")
+        employee_id_input = st.text_input("職員番号", key="login_employee_id")
+        password_input = st.text_input("パスワード", type="password", key="login_password")
 
-    st.sidebar.write(f"現在のユーザー: {st.session_state['employee_id']}")
+        if st.button("ログイン"):
+            conn = sqlite3.connect('document_management.db')
+            c = conn.cursor()
+            c.execute("SELECT password FROM employees WHERE employee_id = ?", (employee_id_input,))
+            result = c.fetchone()
+            conn.close()
 
-    menu_options = [
-        "文書登録",
-        "文書一覧",
-        "社員登録",
-        "社員一覧",
-        "委員会等登録",
-        "委員会等一覧",
-        "閲覧ログ一覧"
-    ]
+            if result:
+                hashed_password_in_db = result[0]
+                if hashed_password_in_db == hash_password(password_input):
+                    st.session_state['logged_in'] = True
+                    st.session_state['employee_id'] = employee_id_input
+                    st.session_state['current_page'] = "文書一覧" # ログイン成功後、文書一覧へ
+                    st.success(f"職員番号 '{employee_id_input}' でログインしました。")
+                    st.rerun()
+                else:
+                    st.error("パスワードが間違っています。")
+            else:
+                st.error("職員番号が見つかりません。")
+        
+        # ログイン画面から社員登録へのリンク
+        st.markdown("---")
+        st.info("アカウントをお持ちでない場合は、社員登録を行ってください。")
+        if st.button("社員登録へ"):
+            st.session_state['current_page'] = "社員登録"
+            st.rerun()
 
-    # サイドバーのラジオボタンでページを切り替える
-    selected_menu = st.sidebar.radio("機能を選択", menu_options, index=menu_options.index(st.session_state['current_page']))
+    else: # ログイン済みの場合
+        st.sidebar.write(f"現在のユーザー: {st.session_state['employee_id']}")
 
-    # ラジオボタンで選択されたら、current_pageを更新
-    if selected_menu != st.session_state['current_page']:
-        st.session_state['current_page'] = selected_menu
-        # ページ遷移時に編集状態をリセット
-        st.session_state['editing_document_id'] = None
-        st.session_state['access_list'] = []
-        st.session_state['current_document_id'] = None
-        st.session_state['current_document_name'] = None
-        st.session_state['selected_doc_for_view'] = None # ページ遷移時に閲覧状態をリセット
-        st.rerun() # ページ遷移を反映
+        # ログアウトボタン
+        if st.sidebar.button("ログアウト"):
+            st.session_state['logged_in'] = False
+            st.session_state['employee_id'] = None
+            st.session_state['current_page'] = "ログイン" # ログアウト後、ログイン画面へ
+            st.session_state['editing_document_id'] = None
+            st.session_state['access_list'] = []
+            st.session_state['current_document_id'] = None
+            st.session_state['current_document_name'] = None
+            st.session_state['selected_doc_for_view'] = None
+            st.success("ログアウトしました。")
+            st.rerun()
 
-    # current_pageに基づいて適切な関数を呼び出す
-    if st.session_state['current_page'] == "文書登録":
-        document_registration()
-    elif st.session_state['current_page'] == "文書一覧":
-        document_list()
-    elif st.session_state['current_page'] == "社員登録":
-        employee_registration()
-    elif st.session_state['current_page'] == "社員一覧":
-        employee_list()
-    elif st.session_state['current_page'] == "委員会等登録":
-        committee_registration()
-    elif st.session_state['current_page'] == "委員会等一覧":
-        committee_list()
-    elif st.session_state['current_page'] == "閲覧ログ一覧":
-        view_log_list()
+        menu_options = [
+            "文書登録",
+            "文書一覧",
+            "社員登録",
+            "社員一覧",
+            "委員会等登録",
+            "委員会等一覧",
+            "閲覧ログ一覧"
+        ]
+
+        # サイドバーのラジオボタンでページを切り替える
+        selected_menu = st.sidebar.radio("機能を選択", menu_options, index=menu_options.index(st.session_state['current_page']))
+
+        # ラジオボタンで選択されたら、current_pageを更新
+        if selected_menu != st.session_state['current_page']:
+            st.session_state['current_page'] = selected_menu
+            # ページ遷移時に編集状態をリセット
+            st.session_state['editing_document_id'] = None
+            st.session_state['access_list'] = []
+            st.session_state['current_document_id'] = None
+            st.session_state['current_document_name'] = None
+            st.session_state['selected_doc_for_view'] = None # ページ遷移時に閲覧状態をリセット
+            st.rerun() # ページ遷移を反映
+
+        # current_pageに基づいて適切な関数を呼び出す
+        if st.session_state['current_page'] == "文書登録":
+            document_registration()
+        elif st.session_state['current_page'] == "文書一覧":
+            document_list()
+        elif st.session_state['current_page'] == "社員登録":
+            employee_registration()
+        elif st.session_state['current_page'] == "社員一覧":
+            employee_list()
+        elif st.session_state['current_page'] == "委員会等登録":
+            committee_registration()
+        elif st.session_state['current_page'] == "委員会等一覧":
+            committee_list()
+        elif st.session_state['current_page'] == "閲覧ログ一覧":
+            view_log_list()
 
 if __name__ == "__main__":
     main()
