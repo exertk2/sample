@@ -2,7 +2,7 @@ import streamlit as st
 import sqlite3
 import hashlib
 import os
-from datetime import datetime, timedelta # Corrected import: added timedelta
+from datetime import datetime, timedelta
 
 # アップロードファイルの保存先ディレクトリ
 UPLOAD_DIR = "uploads"
@@ -278,7 +278,7 @@ def view_document_details(document_id, document_name, issuer, remarks, file_path
     try:
         # 同じ文書を同じユーザーが短時間で複数回閲覧してもログが重複しないようにチェック
         # 例: 過去1分以内に同じ文書を閲覧している場合は記録しない
-        one_minute_ago = datetime.now() - timedelta(minutes=1) # Corrected: used timedelta directly
+        one_minute_ago = datetime.now() - timedelta(minutes=1)
         c.execute("SELECT COUNT(*) FROM view_logs WHERE document_id = ? AND employee_id = ? AND view_timestamp > ?",
                   (document_id, employee_id, one_minute_ago))
         if c.fetchone()[0] == 0:
@@ -346,14 +346,14 @@ def document_list():
     conn.close()
 
     if document_display_list:
-        # Streamlitのデータフレーム表示
-        # 編集ボタンを追加するために、dataframeではなく手動でテーブルを構築
         st.write("### 文書一覧")
-        cols = st.columns([0.1, 0.2, 0.2, 0.3, 0.1, 0.1]) # 列の幅を調整
+        # 列の幅を調整
+        cols = st.columns([0.1, 0.2, 0.2, 0.3, 0.1, 0.1])
         headers = ["文書番号", "文書名", "発行元", "閲覧先", "添付", "操作"]
         for col, header in zip(cols, headers):
             col.write(f"**{header}**")
 
+        # 各文書の行を表示
         for i, doc in enumerate(document_display_list):
             cols = st.columns([0.1, 0.2, 0.2, 0.3, 0.1, 0.1])
             with cols[0]:
@@ -367,24 +367,19 @@ def document_list():
             with cols[4]:
                 st.write("あり" if doc["添付ファイル"] != "なし" else "なし")
             with cols[5]:
-                # 編集ボタン
-                if st.button("編集", key=f"edit_doc_{doc['文書番号']}"):
-                    st.session_state['editing_document_id'] = doc["文書番号"]
-                    st.session_state['current_page'] = "文書登録"
-                    st.rerun()
+                # 閲覧ボタン
+                # ボタンが押されたらview_document_detailsを直接呼び出す
+                if st.button("閲覧", key=f"view_doc_{doc['文書番号']}"):
+                    # セッションステートに選択された文書IDを保存し、再描画後に詳細を表示
+                    st.session_state['selected_doc_for_view'] = doc["文書番号"]
+                    st.rerun() # 画面を再描画して詳細表示をトリガー
 
-        st.markdown("---")
-        st.subheader("文書詳細表示")
-        # 文書を選択して詳細を表示
-        selected_doc_id = st.selectbox(
-            "詳細を表示する文書番号を選択してください",
-            [doc["文書番号"] for doc in document_display_list],
-            key='select_doc_for_details'
-        )
-
-        if selected_doc_id:
+        # 閲覧ボタンが押された場合にのみ詳細を表示
+        if 'selected_doc_for_view' in st.session_state and st.session_state['selected_doc_for_view'] is not None:
+            selected_doc_id = st.session_state['selected_doc_for_view']
             selected_doc = next((doc for doc in document_display_list if doc["文書番号"] == selected_doc_id), None)
             if selected_doc:
+                st.markdown("---")
                 view_document_details(
                     selected_doc["文書番号"],
                     selected_doc["文書名"],
@@ -392,6 +387,9 @@ def document_list():
                     selected_doc["備考"],
                     selected_doc["file_path_raw"]
                 )
+            # 詳細表示後、セッションステートをクリアして次回の閲覧に備える
+            st.session_state['selected_doc_for_view'] = None
+
     else:
         st.info("表示できる文書がありません。")
 
@@ -524,6 +522,7 @@ def main():
         st.session_state['current_document_id'] = None
         st.session_state['current_document_name'] = None
         st.session_state['editing_document_id'] = None # 編集中の文書ID
+        st.session_state['selected_doc_for_view'] = None # 閲覧ボタンで選択された文書ID
 
     # 現在のページを管理するセッションステート
     if 'current_page' not in st.session_state:
@@ -552,6 +551,7 @@ def main():
         st.session_state['access_list'] = []
         st.session_state['current_document_id'] = None
         st.session_state['current_document_name'] = None
+        st.session_state['selected_doc_for_view'] = None # ページ遷移時に閲覧状態をリセット
         st.rerun() # ページ遷移を反映
 
     # current_pageに基づいて適切な関数を呼び出す
