@@ -32,13 +32,14 @@ if 'registered_users' not in st.session_state:
 
 # --- ユーティリティ関数 ---
 def add_log(user, action, document_name):
-    """閲覧ログを追加する関数"""
-    st.session_state.logs.append({
-        'timestamp': datetime.now(),
-        'user': user,
-        'action': action,
-        'document_name': document_name
-    })
+    """閲覧ログを追加する関数 (文書ダウンロード専用に変更)"""
+    if action == "文書ダウンロード": # ログ記録対象をダウンロードのみに限定
+        st.session_state.logs.append({
+            'timestamp': datetime.now(),
+            'user': user,
+            'action': action,
+            'document_name': document_name
+        })
 
 def get_next_doc_id():
     """新しいドキュメントIDを生成する関数"""
@@ -52,12 +53,11 @@ def login_page():
     username = st.text_input("ユーザー名")
     password = st.text_input("パスワード", type="password")
     if st.button("ログイン"):
-        # st.session_state.registered_users を使用して認証
         if username in st.session_state.registered_users and st.session_state.registered_users[username] == password:
             st.session_state.logged_in = True
             st.session_state.username = username
             st.success(f"{username}としてログインしました。")
-            add_log(username, "ログイン", "-")
+            # add_log(username, "ログイン", "-") # ログインログは記録しない
             st.rerun() 
         else:
             st.error("ユーザー名またはパスワードが正しくありません。")
@@ -67,12 +67,11 @@ def main_app():
     """メインアプリケーションのUIを表示する関数"""
     st.sidebar.header(f"ようこそ、{st.session_state.username}さん")
     if st.sidebar.button("ログアウト"):
-        add_log(st.session_state.username, "ログアウト", "-")
+        # add_log(st.session_state.username, "ログアウト", "-") # ログアウトログは記録しない
         st.session_state.logged_in = False
         st.session_state.username = None
         st.rerun()
 
-    # ユーザーの役割に基づいてメニューを動的に変更
     menu = ["文書一覧・閲覧", "文書登録"]
     if st.session_state.username == 'admin':
         menu.extend(["ユーザー登録", "ユーザー一覧"])
@@ -116,7 +115,7 @@ def user_registration_page():
                 st.error("このユーザー名は既に使用されています。")
             else:
                 st.session_state.registered_users[new_username] = new_password
-                add_log(st.session_state.username, "ユーザー登録", new_username)
+                # add_log(st.session_state.username, "ユーザー登録", new_username) # ユーザー登録ログは記録しない
                 st.success(f"ユーザー「{new_username}」を登録しました。")
 
 def display_users_page():
@@ -142,10 +141,7 @@ def upload_document_page():
     doc_description = st.text_area("説明")
     uploaded_file = st.file_uploader("PDFファイルをアップロード", type="pdf")
     
-    # 閲覧権限の設定: 登録ユーザーから複数選択
     all_users = list(st.session_state.registered_users.keys())
-    # アップロード者自身はデフォルトで選択状態にしない（選択されなければアクセス権が付与される）
-    # adminは常にアクセス可能なので、選択肢に含める必要はないが、含めても問題はない
     
     allowed_users = st.multiselect(
         "閲覧を許可するユーザーを選択 (複数選択可):",
@@ -159,10 +155,7 @@ def upload_document_page():
         elif uploaded_file is not None:
             file_data = uploaded_file.read()
             doc_id = get_next_doc_id()
-            
-            # アクセスリストが空の場合、アップロード者のみに設定することも検討できるが、
-            # ここでは選択されたユーザーのみとする。アップロード者と管理者は常にアクセス可能。
-            access_list = list(set(allowed_users)) # 重複除去
+            access_list = list(set(allowed_users)) 
 
             new_document = {
                 'id': doc_id,
@@ -175,7 +168,7 @@ def upload_document_page():
                 'access': access_list 
             }
             st.session_state.documents.append(new_document)
-            add_log(st.session_state.username, "文書登録", doc_name)
+            # add_log(st.session_state.username, "文書登録", doc_name) # 文書登録ログは記録しない
             st.success(f"文書「{doc_name}」を登録しました。")
         else:
             st.warning("PDFファイルをアップロードしてください。")
@@ -188,69 +181,34 @@ def display_documents():
         st.info("登録されている文書はありません。")
         return
 
-    search_term = st.text_input("文書名で検索")
+    search_term = st.text_input("文書名で検索", key="doc_list_search")
 
-    display_docs = []
+    display_docs_for_list = []
     current_user = st.session_state.username
     for doc in st.session_state.documents:
         can_view = False
-        # 1. 管理者は常に閲覧可能
         if current_user == 'admin':
             can_view = True
-        # 2. アップロード者自身は常に閲覧可能
         elif doc['uploader'] == current_user:
             can_view = True
-        # 3. アクセスリストに含まれているユーザーは閲覧可能
         elif current_user in doc['access']:
             can_view = True
         
         if can_view:
             if search_term.lower() in doc['name'].lower():
-                display_docs.append(doc)
+                display_docs_for_list.append(doc)
     
-    if not display_docs:
+    if not display_docs_for_list:
         st.info("条件に合う文書はありません。")
-        return
+        # return # ここでreturnするとダウンロードセクションが表示されないのでコメントアウト
 
     docs_for_df = []
-    for doc in display_docs:
-        # アクセス許可ユーザーの表示名を整形
-        access_display = []
-        if doc['uploader'] not in doc['access'] and 'admin' not in doc['access']: # アップローダーとadminは暗黙の権限
-             access_display.extend(doc['access'])
-        elif doc['uploader'] in doc['access'] and 'admin' not in doc['access']:
-             access_display.extend(u for u in doc['access'] if u != doc['uploader'])
-        elif doc['uploader'] not in doc['access'] and 'admin' in doc['access']:
-             access_display.extend(u for u in doc['access'] if u != 'admin')
-        else: #両方含まれる場合
-             access_display.extend(u for u in doc['access'] if u not in [doc['uploader'], 'admin'])
-
-
-        explicit_users = ", ".join(sorted(list(set(doc['access'])))) if doc['access'] else "アップロード者のみ"
-        if not doc['access'] and doc['uploader'] != 'admin':
-            access_str = f"アップロード者 ({doc['uploader']})"
-        elif not doc['access'] and doc['uploader'] == 'admin':
-             access_str = "管理者のみ"
-        else:
-            access_str = ", ".join(sorted(list(set(doc['access']))))
-        
-        # より正確な表示
-        granted_to = sorted(list(set(doc['access'])))
-        display_access = []
-        if doc['uploader'] == current_user and current_user not in granted_to: #自分がアップローダー
-             pass # 表示上は明示的な権限のみ
-        
-        final_access_display = []
-        if doc['uploader'] not in granted_to: # アップローダーは暗黙の権限
-            final_access_display.append(f"{doc['uploader']} (アップロード者)")
-        
-        final_access_display.extend(granted_to)
-        if 'admin' not in granted_to and doc['uploader'] != 'admin': # adminは暗黙の権限
-             final_access_display.append("admin (管理者)")
-        
-        # 重複を除きソート
-        final_access_display = sorted(list(set(final_access_display)))
-
+    for doc in display_docs_for_list:
+        # 閲覧可能な全ユーザーをリストアップ
+        viewable_by = set(doc['access']) # 明示的に許可されたユーザー
+        viewable_by.add(doc['uploader'])    # アップロード者
+        viewable_by.add('admin')            # 管理者
+        permission_str = ", ".join(sorted(list(viewable_by)))
 
         docs_for_df.append({
             "ID": doc['id'],
@@ -259,56 +217,81 @@ def display_documents():
             "アップロード者": doc['uploader'],
             "ファイル名": doc['filename'],
             "登録日時": doc['uploaded_at'].strftime("%Y-%m-%d %H:%M"),
-            "閲覧許可": ", ".join(granted_to) if granted_to else doc['uploader'] # 表示用
+            "閲覧許可": permission_str
         })
     
     df = pd.DataFrame(docs_for_df)
     
     if not df.empty:
         st.dataframe(df.set_index("ID"), use_container_width=True)
-
-        st.markdown("---")
-        st.subheader("文書ダウンロード")
-        
-        doc_options = {doc['id']: f"{doc['name']} (ID: {doc['id']})" for doc in display_docs}
-        
-        if not doc_options:
-            st.write("ダウンロード可能な文書がありません。")
-            return
-
-        selected_doc_id = st.selectbox("ダウンロードする文書を選択してください:", 
-                                       options=list(doc_options.keys()), 
-                                       format_func=lambda x: doc_options[x],
-                                       key=f"download_select_{datetime.now().timestamp()}") # Ensure unique key for selectbox
-
-        selected_doc_to_download = next((doc for doc in display_docs if doc['id'] == selected_doc_id), None)
-
-        if selected_doc_to_download:
-            # ダウンロードボタンのコールバックでログを記録
-            def record_download_log():
-                # このコールバックが呼ばれた時点でダウンロードが開始される（または直後）
-                # ただし、ユーザーが実際にファイルを保存したかは保証できない
-                add_log(st.session_state.username, "文書ダウンロード", selected_doc_to_download['name'])
-                st.toast(f"「{selected_doc_to_download['name']}」のダウンロードログを記録しました。")
+    elif not search_term and not st.session_state.documents: # 初期状態で文書がない場合
+         pass # 上のst.infoでメッセージ表示済み
+    elif search_term: # 検索したが結果がない場合
+        st.info("検索条件に合う文書は一覧にありません。")
 
 
-            st.download_button(
-                label=f"「{selected_doc_to_download['name']}」をダウンロード",
-                data=selected_doc_to_download['data'],
-                file_name=selected_doc_to_download['filename'],
-                mime="application/pdf",
-                on_click=record_download_log, # on_clickでログ記録関数を呼び出し
-                key=f"download_btn_{selected_doc_id}_{datetime.now().timestamp()}" # Ensure unique key for button
-            )
-        else:
-            st.write("選択された文書が見つかりません。")
+    st.markdown("---")
+    st.subheader("文書ダウンロード")
+
+    # ダウンロードセクション用のフィルタ
+    download_filter_text = st.text_input(
+        "ダウンロード対象をフィルタリング (文書名, 説明, ファイル名):", 
+        key="download_filter"
+    )
+
+    # ダウンロード可能な文書は、一覧に表示されている文書（display_docs_for_list）を元にする
+    docs_for_download_selection = []
+    if not download_filter_text:
+        docs_for_download_selection = display_docs_for_list
     else:
-        st.info("表示できる文書がありません。")
+        for doc in display_docs_for_list: # 既に閲覧権限チェック済みのリストからフィルタ
+            if (download_filter_text.lower() in doc['name'].lower() or
+                download_filter_text.lower() in doc['description'].lower() or
+                download_filter_text.lower() in doc['filename'].lower()):
+                docs_for_download_selection.append(doc)
+
+    if not docs_for_download_selection:
+        if display_docs_for_list: # フィルタによって候補がなくなった場合
+             st.write("フィルタ条件に合うダウンロード可能な文書がありません。")
+        elif not st.session_state.documents : #そもそも文書がない
+             st.write("ダウンロード可能な文書がありません。")
+        # else:  一覧に表示される文書がないが、display_docs_for_listが空ではないケースは通常ない
+        return
+
+
+    doc_options = {doc['id']: f"{doc['name']} (ID: {doc['id']})" for doc in docs_for_download_selection}
+    
+    if not doc_options: #念のため
+        st.write("ダウンロード可能な文書が選択肢にありません。")
+        return
+
+    selected_doc_id = st.selectbox("ダウンロードする文書を選択してください:", 
+                                   options=list(doc_options.keys()), 
+                                   format_func=lambda x: doc_options.get(x, "不明な文書"), # .getで存在しないキーに対応
+                                   key=f"download_select_{datetime.now().timestamp()}") 
+
+    selected_doc_to_download = next((doc for doc in docs_for_download_selection if doc['id'] == selected_doc_id), None)
+
+    if selected_doc_to_download:
+        def record_download_log():
+            add_log(st.session_state.username, "文書ダウンロード", selected_doc_to_download['name'])
+            st.toast(f"「{selected_doc_to_download['name']}」のダウンロードログを記録しました。")
+
+        st.download_button(
+            label=f"「{selected_doc_to_download['name']}」をダウンロード",
+            data=selected_doc_to_download['data'],
+            file_name=selected_doc_to_download['filename'],
+            mime="application/pdf",
+            on_click=record_download_log,
+            key=f"download_btn_{selected_doc_id}_{datetime.now().timestamp()}" 
+        )
+    elif doc_options : # doc_optionsはあるが、selected_doc_to_downloadが見つからない場合（通常発生しにくい）
+        st.write("選択された文書が見つかりません。")
 
 
 def display_logs():
     """閲覧ログを表示する関数"""
-    st.subheader("閲覧ログ")
+    st.subheader("閲覧ログ (文書ダウンロードのみ)")
     if not st.session_state.logs:
         st.info("ログはありません。")
         return
@@ -320,7 +303,7 @@ def display_logs():
         log_df = log_df.sort_values(by='timestamp', ascending=False)
         st.dataframe(log_df.reset_index(drop=True), use_container_width=True)
     else:
-        st.info("ログデータが空です。")
+        st.info("ログデータが空です。") # フィルタリングされた結果、ログがない場合も含む
 
 
 # --- アプリケーションの実行フロー ---
