@@ -2,7 +2,7 @@ import streamlit as st
 import sqlite3
 import hashlib
 import os
-from datetime import datetime
+from datetime import datetime, timedelta # Corrected import: added timedelta
 
 # アップロードファイルの保存先ディレクトリ
 UPLOAD_DIR = "uploads"
@@ -278,7 +278,7 @@ def view_document_details(document_id, document_name, issuer, remarks, file_path
     try:
         # 同じ文書を同じユーザーが短時間で複数回閲覧してもログが重複しないようにチェック
         # 例: 過去1分以内に同じ文書を閲覧している場合は記録しない
-        one_minute_ago = datetime.now() - datetime.timedelta(minutes=1)
+        one_minute_ago = datetime.now() - timedelta(minutes=1) # Corrected: used timedelta directly
         c.execute("SELECT COUNT(*) FROM view_logs WHERE document_id = ? AND employee_id = ? AND view_timestamp > ?",
                   (document_id, employee_id, one_minute_ago))
         if c.fetchone()[0] == 0:
