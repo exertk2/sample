@@ -86,7 +86,26 @@ def document_registration():
     conn.close()
 
     doc_options = ["新規文書"] + [f"{doc[0]}: {doc[1]}" for doc in existing_documents]
-    selected_doc_option = st.selectbox("編集する文書を選択、または新規文書を作成", doc_options, key='doc_select')
+    
+    # Determine the initial index for the selectbox
+    initial_select_index = 0 # Default to "新規文書"
+    if st.session_state.get('editing_document_id'):
+        try:
+            # Find the index of the current editing document in doc_options
+            # Add 1 because "新規文書" is at index 0
+            initial_select_index = next(
+                (i + 1 for i, doc in enumerate(existing_documents) if doc[0] == st.session_state['editing_document_id']),
+                0
+            )
+        except StopIteration:
+            initial_select_index = 0 # Fallback if not found (shouldn't happen if editing_document_id is valid)
+
+    selected_doc_option = st.selectbox(
+        "編集する文書を選択、または新規文書を作成",
+        doc_options,
+        index=initial_select_index, # Set initial index
+        key='doc_select'
+    )
 
     editing_document_id = None
     if selected_doc_option != "新規文書":
@@ -140,6 +159,7 @@ def document_registration():
             st.session_state['current_document_name'] = None
     
     # 既存文書選択時のフォーム値の再設定（セレクトボックスの変更で再描画されるため）
+    # このブロックは、selected_doc_optionが変更されたときに、フォームの初期値を正しく設定するために必要
     if editing_document_id:
         conn = sqlite3.connect('document_management.db')
         c = conn.cursor()
@@ -147,6 +167,9 @@ def document_registration():
         doc_data = c.fetchone()
         if doc_data:
             document_name, issuer, remarks, current_file_path = doc_data
+            st.session_state['doc_name_input'] = document_name
+            st.session_state['issuer_input'] = issuer
+            st.session_state['remarks_input'] = remarks
         conn.close()
 
 
@@ -181,42 +204,51 @@ def document_registration():
                 st.success("既存の添付ファイルを削除しました。")
             file_path_to_save = None
 
+        try:
+            conn = sqlite3.connect('document_management.db')
+            c = conn.cursor()
 
-        conn = sqlite3.connect('document_management.db')
-        c = conn.cursor()
+            if st.session_state['editing_document_id']:
+                # 更新
+                c.execute("UPDATE documents SET document_name = ?, issuer = ?, remarks = ?, file_path = ? WHERE document_id = ?",
+                          (document_name, issuer, remarks, file_path_to_save, st.session_state['editing_document_id']))
+                document_id = st.session_state['editing_document_id']
+                st.success(f"文書番号 {document_id} を更新しました。")
+            else:
+                # 新規登録
+                c.execute("INSERT INTO documents (document_name, issuer, remarks, file_path) VALUES (?, ?, ?, ?)",
+                          (document_name, issuer, remarks, file_path_to_save))
+                document_id = c.lastrowid
+                st.success(f"文書 '{document_name}' を文書番号 {document_id} で登録しました。")
+                st.session_state['current_document_id'] = document_id
+                st.session_state['current_document_name'] = document_name
 
-        if st.session_state['editing_document_id']:
-            # 更新
-            c.execute("UPDATE documents SET document_name = ?, issuer = ?, remarks = ?, file_path = ? WHERE document_id = ?",
-                      (document_name, issuer, remarks, file_path_to_save, st.session_state['editing_document_id']))
-            document_id = st.session_state['editing_document_id']
-            st.success(f"文書番号 {document_id} を更新しました。")
-        else:
-            # 新規登録
-            c.execute("INSERT INTO documents (document_name, issuer, remarks, file_path) VALUES (?, ?, ?, ?)",
-                      (document_name, issuer, remarks, file_path_to_save))
-            document_id = c.lastrowid
-            st.success(f"文書 '{document_name}' を文書番号 {document_id} で登録しました。")
-            st.session_state['current_document_id'] = document_id
-            st.session_state['current_document_name'] = document_name
+            # Debugging: print access_list before saving
+            # st.write(f"DEBUG: Access list before DB save: {st.session_state.get('access_list', [])}")
 
-        # 閲覧先登録の処理
-        # 既存の閲覧先を全て削除してから再登録
-        c.execute("DELETE FROM document_access WHERE document_id = ?", (document_id,))
-        for access in st.session_state.get('access_list', []):
-            c.execute("INSERT INTO document_access (document_id, access_type, access_value) VALUES (?, ?, ?)",
-                      (document_id, access['type'], access['value']))
-        conn.commit()
-        conn.close()
-        st.success("閲覧先を保存しました。")
-        
-        # 処理完了後、編集モードを解除し、閲覧先リストをクリア
-        st.session_state['editing_document_id'] = None
-        st.session_state['access_list'] = [] # 保存後にセッションステートのリストをクリア
-        st.session_state['current_document_id'] = None
-        st.session_state['current_document_name'] = None
-        st.session_state['current_doc_select_id'] = None # 選択状態もリセット
-        st.rerun() # 画面をリフレッシュしてフォームをクリア
+            # 閲覧先登録の処理
+            # 既存の閲覧先を全て削除してから再登録
+            c.execute("DELETE FROM document_access WHERE document_id = ?", (document_id,))
+            for access in st.session_state.get('access_list', []):
+                # st.write(f"Inserting access: {access['type']}, {access['value']}") # Debug print
+                c.execute("INSERT INTO document_access (document_id, access_type, access_value) VALUES (?, ?, ?)",
+                          (document_id, access['type'], access['value']))
+            conn.commit()
+            st.success("閲覧先を保存しました。")
+            
+            # 処理完了後、編集モードを解除し、閲覧先リストをクリア
+            st.session_state['editing_document_id'] = None
+            st.session_state['access_list'] = [] # 保存後にセッションステートのリストをクリア
+            st.session_state['current_document_id'] = None
+            st.session_state['current_document_name'] = None
+            st.session_state['current_doc_select_id'] = None # 選択状態もリセット
+            st.session_state['current_page'] = "文書一覧" # 文書一覧ページへ遷移
+            st.rerun() # 画面をリフレッシュしてフォームをクリア
+
+        except sqlite3.Error as e:
+            st.error(f"データベースエラーが発生しました: {e}")
+        finally:
+            conn.close()
 
     st.markdown(f"---")
     st.subheader(f"閲覧先登録 (文書番号: {st.session_state.get('current_document_id', '未選択')}, 文書名: {st.session_state.get('current_document_name', '未選択')})")
@@ -226,29 +258,32 @@ def document_registration():
         access_value = st.text_input(f"{access_type}を入力", key='access_value_input')
 
         if st.button("閲覧先を追加", key='add_access_button'):
-            if access_type == "職員番号別":
-                conn = sqlite3.connect('document_management.db')
-                c = conn.cursor()
-                c.execute("SELECT employee_id FROM employees WHERE employee_id = ?", (access_value,))
-                if not c.fetchone():
-                    st.warning("指定された職員番号は存在しません。")
+            if access_value: # 空の値を登録しないようにチェック
+                if access_type == "職員番号別":
+                    conn = sqlite3.connect('document_management.db')
+                    c = conn.cursor()
+                    c.execute("SELECT employee_id FROM employees WHERE employee_id = ?", (access_value,))
+                    if not c.fetchone():
+                        st.warning("指定された職員番号は存在しません。")
+                        conn.close()
+                        return
                     conn.close()
-                    return
-                conn.close()
-                st.session_state.setdefault('access_list', []).append({'type': 'employee', 'value': access_value})
-            elif access_type == "部署別":
-                st.session_state.setdefault('access_list', []).append({'type': 'department', 'value': access_value})
-            elif access_type == "委員会名等別":
-                conn = sqlite3.connect('document_management.db')
-                c = conn.cursor()
-                c.execute("SELECT committee_name FROM committees WHERE committee_name = ?", (access_value,))
-                if not c.fetchone():
-                    st.warning("指定された委員会名等は存在しません。")
+                    st.session_state.setdefault('access_list', []).append({'type': 'employee', 'value': access_value})
+                elif access_type == "部署別":
+                    st.session_state.setdefault('access_list', []).append({'type': 'department', 'value': access_value})
+                elif access_type == "委員会名等別":
+                    conn = sqlite3.connect('document_management.db')
+                    c = conn.cursor()
+                    c.execute("SELECT committee_name FROM committees WHERE committee_name = ?", (access_value,))
+                    if not c.fetchone():
+                        st.warning("指定された委員会名等は存在しません。")
+                        conn.close()
+                        return
                     conn.close()
-                    return
-                conn.close()
-                st.session_state.setdefault('access_list', []).append({'type': 'committee', 'value': access_value})
-            st.success(f"{access_type}: {access_value} を追加しました。")
+                    st.session_state.setdefault('access_list', []).append({'type': 'committee', 'value': access_value})
+                st.success(f"{access_type}: {access_value} を追加しました。")
+            else:
+                st.warning("閲覧先を入力してください。")
 
         if st.session_state.get('access_list'):
             st.write("登録済み閲覧先:")
@@ -324,6 +359,7 @@ def document_list():
     for doc_id, doc_name, issuer, remarks, file_path in documents:
         c.execute("SELECT access_type, access_value FROM document_access WHERE document_id = ?", (doc_id,))
         accesses = c.fetchall()
+        # st.write(f"Document ID: {doc_id}, Fetched accesses: {accesses}") # Debug print
         access_info = []
         for access_type, access_value in accesses:
             access_info.append(f"{access_type}:{access_value}")
@@ -603,9 +639,13 @@ def main():
 
         # ラジオボタンで選択されたら、current_pageを更新
         if selected_menu != st.session_state['current_page']:
+            # Preserve editing_document_id if coming from '編集' button
+            # このチェックは、'文書一覧'の'編集'ボタンによってediting_document_idが設定されている場合に、
+            # '文書登録'へのページ遷移時にediting_document_idがクリアされるのを防ぎます。
+            if not (selected_menu == "文書登録" and st.session_state.get('editing_document_id') is not None):
+                st.session_state['editing_document_id'] = None
+
             st.session_state['current_page'] = selected_menu
-            # ページ遷移時に編集状態をリセット
-            st.session_state['editing_document_id'] = None
             st.session_state['access_list'] = []
             st.session_state['current_document_id'] = None
             st.session_state['current_document_name'] = None
