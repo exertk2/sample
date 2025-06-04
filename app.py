@@ -99,48 +99,60 @@ def document_registration():
     issuer = ""
     remarks = ""
     current_file_path = None
-    access_list_initial = []
 
-    if st.session_state['editing_document_id']:
-        st.info(f"文書番号 {st.session_state['editing_document_id']} を編集します。")
+    # access_listの初期化と管理を改善
+    # selected_doc_optionが変更されたとき、または初めてページがロードされたときにのみaccess_listをロード/クリアする
+    if 'current_doc_select_id' not in st.session_state or \
+       st.session_state['current_doc_select_id'] != selected_doc_option:
+        
+        st.session_state['current_doc_select_id'] = selected_doc_option # 選択されたオプションを記録
+        
+        if editing_document_id:
+            st.info(f"文書番号 {editing_document_id} を編集します。")
+            conn = sqlite3.connect('document_management.db')
+            c = conn.cursor()
+            c.execute("SELECT document_name, issuer, remarks, file_path FROM documents WHERE document_id = ?", (editing_document_id,))
+            doc_data = c.fetchone()
+            if doc_data:
+                document_name, issuer, remarks, current_file_path = doc_data
+
+            c.execute("SELECT access_type, access_value FROM document_access WHERE document_id = ?", (editing_document_id,))
+            existing_accesses = c.fetchall()
+            st.session_state['access_list'] = [{'type': acc[0], 'value': acc[1]} for acc in existing_accesses]
+            conn.close()
+            
+            # フォームの初期値を設定
+            st.session_state['doc_name_input'] = document_name
+            st.session_state['issuer_input'] = issuer
+            st.session_state['remarks_input'] = remarks
+            st.session_state['current_document_id'] = editing_document_id
+            st.session_state['current_document_name'] = document_name
+        else: # 新規文書の場合
+            # フォームをクリア
+            if 'doc_name_input' in st.session_state:
+                del st.session_state['doc_name_input']
+            if 'issuer_input' in st.session_state:
+                del st.session_state['issuer_input']
+            if 'remarks_input' in st.session_state:
+                del st.session_state['remarks_input']
+            st.session_state['access_list'] = [] # 新規文書の場合はアクセスリストをクリア
+            st.session_state['current_document_id'] = None
+            st.session_state['current_document_name'] = None
+    
+    # 既存文書選択時のフォーム値の再設定（セレクトボックスの変更で再描画されるため）
+    if editing_document_id:
         conn = sqlite3.connect('document_management.db')
         c = conn.cursor()
-        c.execute("SELECT document_name, issuer, remarks, file_path FROM documents WHERE document_id = ?", (st.session_state['editing_document_id'],))
+        c.execute("SELECT document_name, issuer, remarks, file_path FROM documents WHERE document_id = ?", (editing_document_id,))
         doc_data = c.fetchone()
         if doc_data:
             document_name, issuer, remarks, current_file_path = doc_data
-
-        c.execute("SELECT access_type, access_value FROM document_access WHERE document_id = ?", (st.session_state['editing_document_id'],))
-        existing_accesses = c.fetchall()
-        access_list_initial = [{'type': acc[0], 'value': acc[1]} for acc in existing_accesses]
         conn.close()
 
-        # 既存の閲覧先をセッションステートにロード
-        if 'access_list' not in st.session_state or st.session_state['current_document_id'] != st.session_state['editing_document_id']:
-            st.session_state['access_list'] = access_list_initial
-            st.session_state['current_document_id'] = st.session_state['editing_document_id']
-            st.session_state['current_document_name'] = document_name
-        
-        # フォームの初期値を設定
-        st.session_state['doc_name_input'] = document_name
-        st.session_state['issuer_input'] = issuer
-        st.session_state['remarks_input'] = remarks
-    else:
-        # 新規文書の場合、フォームをクリア
-        if 'doc_name_input' in st.session_state:
-            del st.session_state['doc_name_input']
-        if 'issuer_input' in st.session_state:
-            del st.session_state['issuer_input']
-        if 'remarks_input' in st.session_state:
-            del st.session_state['remarks_input']
-        st.session_state['access_list'] = [] # 新規文書の場合はアクセスリストをクリア
-        st.session_state['current_document_id'] = None
-        st.session_state['current_document_name'] = None
 
-
-    document_name = st.text_input("文書名", value=st.session_state.get('doc_name_input', ''), key='doc_name_input_key')
-    issuer = st.text_input("発行元", value=st.session_state.get('issuer_input', ''), key='issuer_input_key')
-    remarks = st.text_area("備考", value=st.session_state.get('remarks_input', ''), key='remarks_input_key')
+    document_name = st.text_input("文書名", value=st.session_state.get('doc_name_input', document_name), key='doc_name_input_key')
+    issuer = st.text_input("発行元", value=st.session_state.get('issuer_input', issuer), key='issuer_input_key')
+    remarks = st.text_area("備考", value=st.session_state.get('remarks_input', remarks), key='remarks_input_key')
 
     if current_file_path and os.path.exists(current_file_path):
         st.write(f"現在の添付ファイル: {os.path.basename(current_file_path)}")
@@ -200,9 +212,10 @@ def document_registration():
         
         # 処理完了後、編集モードを解除し、閲覧先リストをクリア
         st.session_state['editing_document_id'] = None
-        st.session_state['access_list'] = []
+        st.session_state['access_list'] = [] # 保存後にセッションステートのリストをクリア
         st.session_state['current_document_id'] = None
         st.session_state['current_document_name'] = None
+        st.session_state['current_doc_select_id'] = None # 選択状態もリセット
         st.rerun() # 画面をリフレッシュしてフォームをクリア
 
     st.markdown(f"---")
@@ -248,7 +261,6 @@ def document_registration():
                         st.session_state['access_list'].pop(i)
                         st.rerun() # リスト更新のため再描画
 
-        # 閲覧先確定ボタンは不要になったため削除 (メインの更新ボタンで一括処理)
     else:
         st.info("文書を登録または選択すると、閲覧先を登録できます。")
 
@@ -524,6 +536,7 @@ def main():
         st.session_state['editing_document_id'] = None # 編集中の文書ID
         st.session_state['selected_doc_for_view'] = None # 閲覧ボタンで選択された文書ID
         st.session_state['current_page'] = "ログイン" # 初期表示ページをログイン画面に設定
+        st.session_state['current_doc_select_id'] = None # 選択された文書オプションを追跡
 
     # ログイン画面
     if not st.session_state['logged_in']:
@@ -571,6 +584,7 @@ def main():
             st.session_state['current_document_id'] = None
             st.session_state['current_document_name'] = None
             st.session_state['selected_doc_for_view'] = None
+            st.session_state['current_doc_select_id'] = None # ログアウト時もリセット
             st.success("ログアウトしました。")
             st.rerun()
 
@@ -596,6 +610,7 @@ def main():
             st.session_state['current_document_id'] = None
             st.session_state['current_document_name'] = None
             st.session_state['selected_doc_for_view'] = None # ページ遷移時に閲覧状態をリセット
+            st.session_state['current_doc_select_id'] = None # ページ遷移時に選択状態をリセット
             st.rerun() # ページ遷移を反映
 
         # current_pageに基づいて適切な関数を呼び出す
