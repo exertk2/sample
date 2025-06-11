@@ -1,243 +1,247 @@
 import streamlit as st
+import sqlite3
 import pandas as pd
+import datetime
 
-# --- 1. データ準備 (本来はデータベースで管理) ---
-def setup_initial_data():
-    """デモ用のユーザー、考課設定、評価データを準備します。"""
-    # ユーザー情報: {ユーザーID: {name: 名前, password: パスワード}}
-    users = {
-        "manager01": {"name": "鈴木 一郎 (部長)", "password": "a"},
-        "leader01": {"name": "佐藤 次郎 (課長)", "password": "b"},
-        "member01": {"name": "田中 三郎 (メンバー)", "password": "c"},
-        "member02": {"name": "高橋 四郎 (メンバー)", "password": "d"}
-    }
+# --- データベース設定 ---
+DB_NAME = "trip_management.db"
 
-    # 考課者設定: {被評価者ID: [考課者ID1, 考課者ID2, ...]}
-    # 田中さんは鈴木部長と佐藤課長から評価される
-    # 高橋さんも鈴木部長と佐藤課長から評価される
-    # 佐藤課長は鈴木部長から評価される
-    evaluators_map = {
-        "member01": ["manager01", "leader01"],
-        "member02": ["manager01", "leader01"],
-        "leader01": ["manager01"]
-    }
+def get_db_connection():
+    """データベース接続を取得します。"""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-    # 評価項目
-    evaluation_items = {
-        "人間力": ["協調性", "責任感", "積極性"],
-        "仕事力": ["業務遂行力", "課題解決力", "企画・提案力"]
-    }
-
-    # 評価データ (ここに評価結果が蓄積される)
-    # 構造: {被評価者ID: {考課者ID: {項目: {score: 5, comment: "..."}}}}
-    evaluations = {}
-
-    return users, evaluators_map, evaluation_items, evaluations
-
-# --- 2. Streamlitのセッション初期化 ---
-def initialize_session_state():
-    """アプリケーションの初回起動時にセッションを初期化します。"""
-    if 'initialized' not in st.session_state:
-        users, evaluators_map, items, evaluations = setup_initial_data()
-        st.session_state.users = users
-        st.session_state.evaluators_map = evaluators_map
-        st.session_state.evaluation_items = items
-        st.session_state.evaluations = evaluations
-        st.session_state.logged_in = False
-        st.session_state.user_id = None
-        st.session_state.user_name = None
-        st.session_state.initialized = True
-        
-        # デモ用に田中さんへの鈴木部長からの評価を事前に入れておく
-        st.session_state.evaluations.setdefault("member01", {})["manager01"] = {
-            "協調性": {"score": 5, "comment": "チームの中心として素晴らしい活躍を見せた。"},
-            "責任感": {"score": 4, "comment": "担当案件を最後までやり遂げる力がある。"},
-            "積極性": {"score": 4, "comment": "定例会での改善提案も的確だった。"},
-            "業務遂行力": {"score": 5, "comment": "常に期待以上の成果を出しており、安心して任せられる。"},
-            "課題解決力": {"score": 4, "comment": "発生した問題にも冷静に対処し、解決に導いた。"},
-            "企画・提案力": {"score": 3, "comment": "もう少し広い視野での提案ができるとさらに良い。"}
-        }
-
-# --- 3. ログイン画面 ---
-def login_screen():
-    """ログイン画面を表示し、認証処理を行います。"""
-    st.title("人事考課アプリ")
+def init_db():
+    """データベースとテーブルを初期化します。"""
+    conn = get_db_connection()
+    c = conn.cursor()
+    # テーブル作成 (ご提示のスキーマを修正)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS trip (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_id INTEGER NOT NULL,
+            employee TEXT NOT NULL,
+            seq TEXT,
+            sex_code INTEGER,
+            sex_name TEXT,
+            department_code INTEGER,
+            department_name TEXT,
+            ward_code INTEGER,
+            ward_name TEXT,
+            timestamp TEXT DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
+            history_number INTEGER DEFAULT 1,
+            "1st_choice" TEXT,
+            "2nd_choice" TEXT,
+            bus TEXT,
+            allergy TEXT,
+            allergy_details TEXT
+        )
+    ''')
     
-    user_id = st.text_input("ユーザーID")
-    password = st.text_input("パスワード", type="password")
-
-    if st.button("ログイン"):
-        users = st.session_state.users
-        if user_id in users and users[user_id]["password"] == password:
-            st.session_state.logged_in = True
-            st.session_state.user_id = user_id
-            st.session_state.user_name = users[user_id]["name"]
-            st.rerun()  # ログイン成功したら再実行してメイン画面へ
-        else:
-            st.error("ユーザーIDまたはパスワードが正しくありません。")
-
-# --- 4. 評価入力ページ ---
-def show_evaluation_input_page():
-    """考課者が被評価者の評価を入力するページです。"""
-    st.header(f"評価入力")
+    # --- サンプルデータの投入 (初回実行時のみ) ---
+    c.execute("SELECT COUNT(*) FROM trip")
+    if c.fetchone()[0] == 0:
+        sample_employees = [
+            (101, '鈴木 一郎', 'A-1', 1, '男性', 10, '総務部', 101, '第一病棟'),
+            (102, '佐藤 花子', 'A-2', 2, '女性', 10, '総務部', 102, '第二病棟'),
+            (201, '高橋 健太', 'B-1', 1, '男性', 20, '経理部', 201, '第三病棟'),
+            (202, '田中 美咲', 'B-2', 2, '女性', 20, '経理部', 101, '第一病棟'),
+            (301, '渡辺 雄大', 'C-1', 1, '男性', 30, '人事部', 102, '第二病棟'),
+        ]
+        for emp in sample_employees:
+            c.execute('''
+                INSERT INTO trip (employee_id, employee, seq, sex_code, sex_name, department_code, department_name, ward_code, ward_name, "1st_choice", "2nd_choice", bus, allergy, allergy_details)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (*emp, '未選択', '未選択', '未選択', 'なし', ''))
     
-    current_user_id = st.session_state.user_id
-    
-    # 自分が考課者になっている被評価者をリストアップ
-    targets_to_evaluate = [
-        target_id for target_id, evaluators in st.session_state.evaluators_map.items()
-        if current_user_id in evaluators
-    ]
+    conn.commit()
+    conn.close()
 
-    if not targets_to_evaluate:
-        st.info("あなたが評価する対象者はいません。")
+def get_all_trips():
+    """全ての旅行データを取得します。"""
+    conn = get_db_connection()
+    df = pd.read_sql_query("SELECT * FROM trip ORDER BY employee_id, history_number DESC", conn)
+    conn.close()
+    return df
+
+def get_latest_trips():
+    """各職員の最新の旅行データを取得します。"""
+    df = get_all_trips()
+    if not df.empty:
+        # employee_idでグループ化し、history_numberが最大の行のインデックスを取得
+        latest_idx = df.groupby('employee_id')['history_number'].idxmax()
+        return df.loc[latest_idx]
+    return pd.DataFrame()
+
+def get_employee_master():
+    """職員マスタ（重複除外）を取得します。"""
+    df = get_latest_trips()
+    if not df.empty:
+        return df[['employee_id', 'employee', 'seq', 'sex_code', 'sex_name', 'department_code', 'department_name', 'ward_code', 'ward_name']].drop_duplicates().sort_values('employee_id')
+    return pd.DataFrame()
+
+
+def add_trip_record(employee_id, choice1, choice2, bus, allergy, allergy_details):
+    """新しい旅行記録を追加（更新）します。"""
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    # 既存の職員情報を取得
+    c.execute("SELECT * FROM trip WHERE employee_id = ? ORDER BY history_number DESC LIMIT 1", (employee_id,))
+    latest_record = c.fetchone()
+    
+    if not latest_record:
+        st.error("指定された職員IDが見つかりません。")
+        conn.close()
         return
 
-    # プルダウンで評価対象を選択
-    target_names = {uid: st.session_state.users[uid]['name'] for uid in targets_to_evaluate}
-    selected_target_name = st.selectbox(
-        "評価する社員を選択してください",
-        options=list(target_names.values())
-    )
+    # 新しい履歴番号を計算
+    new_history_number = latest_record['history_number'] + 1
     
-    # 選択された名前からIDを逆引き
-    selected_target_id = [uid for uid, name in target_names.items() if name == selected_target_name][0]
-
-    st.subheader(f"【{selected_target_name}】さんの評価")
+    # 新しいレコードを挿入
+    c.execute('''
+        INSERT INTO trip (
+            employee_id, employee, seq, sex_code, sex_name, 
+            department_code, department_name, ward_code, ward_name, 
+            history_number, "1st_choice", "2nd_choice", bus, allergy, allergy_details
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        latest_record['employee_id'], latest_record['employee'], latest_record['seq'],
+        latest_record['sex_code'], latest_record['sex_name'], latest_record['department_code'],
+        latest_record['department_name'], latest_record['ward_code'], latest_record['ward_name'],
+        new_history_number, choice1, choice2, bus, allergy, allergy_details
+    ))
     
-    # 既に入力済みかチェックし、メッセージを表示
-    if st.session_state.evaluations.get(selected_target_id, {}).get(current_user_id):
-        st.warning("この社員の評価は既に入力済みです。修正する場合は、再度入力して提出してください。")
+    conn.commit()
+    conn.close()
 
-    # 評価入力フォーム
-    with st.form(key=f"eval_form_{selected_target_id}"):
-        scores = {}
-        comments = {}
-        items = st.session_state.evaluation_items
+
+# --- Streamlit UI ---
+
+st.set_page_config(page_title="職員研修旅行管理アプリ", layout="wide")
+st.title("職員研修旅行管理アプリ")
+
+# --- サイドバー (ナビゲーション) ---
+menu = ["入力", "一覧（最新）", "一覧（全履歴）", "印刷用リスト（基本）", "印刷用リスト（アレルギー情報付き）"]
+choice = st.sidebar.selectbox("メニューを選択", menu)
+st.sidebar.markdown("---")
+st.sidebar.info("このアプリは職員の研修旅行の希望を管理します。")
+
+# --- ページごとの表示 ---
+
+if choice == "入力":
+    st.header("希望の入力・更新")
+    
+    employee_master = get_employee_master()
+    if not employee_master.empty:
+        employee_dict = dict(zip(employee_master['employee_id'], employee_master['employee']))
         
-        for category, item_list in items.items():
-            st.markdown(f"#### {category}")
-            for item in item_list:
-                cols = st.columns([2, 3, 4])
-                with cols[0]:
-                    st.write(item)
-                with cols[1]:
-                    scores[item] = st.radio(
-                        "点数", options=[1, 2, 3, 4, 5], horizontal=True,
-                        label_visibility="collapsed", key=f"score_{selected_target_id}_{item}"
-                    )
-                with cols[2]:
-                    comments[item] = st.text_input(
-                        "コメント", placeholder="具体的な行動やエピソードを記入",
-                        label_visibility="collapsed", key=f"comment_{selected_target_id}_{item}"
-                    )
-        
-        submitted = st.form_submit_button("この内容で評価を提出する")
+        selected_employee_id = st.selectbox(
+            "職員を選択してください",
+            options=list(employee_dict.keys()),
+            format_func=lambda x: f"{x}: {employee_dict[x]}"
+        )
 
-        if submitted:
-            evaluation_data = {item: {"score": scores[item], "comment": comments[item]} for item in scores}
-            st.session_state.evaluations.setdefault(selected_target_id, {})[current_user_id] = evaluation_data
-            st.success(f"{selected_target_name}さんの評価を保存しました。")
+        # 最新の登録情報を取得してフォームのデフォルト値に設定
+        latest_trips = get_latest_trips()
+        current_data = latest_trips[latest_trips['employee_id'] == selected_employee_id].iloc[0]
 
-# --- 5. 自分の評価閲覧ページ ---
-def show_my_evaluation_page():
-    """ログインユーザー自身の評価結果を表示するページです。"""
-    st.header("あなたの評価")
-    
-    my_id = st.session_state.user_id
-    my_evaluations = st.session_state.evaluations.get(my_id)
-    
-    if not my_evaluations:
-        st.info("あなたの評価はまだ入力されていません。")
-        return
-        
-    all_evaluators_for_me = st.session_state.evaluators_map.get(my_id, [])
-    
-    # 全員の評価が完了しているかチェック
-    if len(my_evaluations) < len(all_evaluators_for_me):
-        st.warning(f"全考課者({len(all_evaluators_for_me)}名)の評価が完了していません。現在{len(my_evaluations)}名が入力済みです。")
-
-    # --- データフレームを作成して評価を一覧表示 ---
-    items_flat = [item for sublist in st.session_state.evaluation_items.values() for item in sublist]
-    
-    # 考課者ごとのスコアとコメントを収集
-    scores_by_item = {item: [] for item in items_flat}
-    comments_by_evaluator = {}
-    evaluator_names = {eid: st.session_state.users[eid]['name'] for eid in my_evaluations.keys()}
-
-    for evaluator_id, eval_data in my_evaluations.items():
-        evaluator_name = evaluator_names[evaluator_id]
-        comments_by_evaluator[evaluator_name] = {}
-        for item, data in eval_data.items():
-            if item in scores_by_item:
-                scores_by_item[item].append(data['score'])
-                comments_by_evaluator[evaluator_name][item] = data['comment']
-
-    # 表データを作成
-    results_list = []
-    total_avg_score = 0
-    for category, item_list in st.session_state.evaluation_items.items():
-        for item in item_list:
-            scores = scores_by_item.get(item, [])
-            avg_score = sum(scores) / len(scores) if scores else 0
-            total_avg_score += avg_score
+        with st.form("trip_form"):
+            st.markdown(f"**選択中の職員:** {current_data['employee']} (ID: {current_data['employee_id']})")
             
-            row = {"カテゴリ": category, "評価項目": item}
-            for i, evaluator_id in enumerate(my_evaluations.keys()):
-                evaluator_name = evaluator_names[evaluator_id]
-                score = my_evaluations[evaluator_id].get(item, {}).get('score', '未')
-                row[f"考課者{i+1} ({evaluator_name.split(' ')[0]})"] = score
-            row["平均点"] = f"{avg_score:.2f}"
-            results_list.append(row)
+            # 選択肢の定義
+            course_options = ["未選択", "Aコース：温泉とグルメの旅", "Bコース：歴史と文化探訪", "Cコース：アクティビティ体験"]
+            bus_options = ["未選択", "1号車", "2号車", "3号車", "不要"]
+            
+            choice1 = st.selectbox("第1希望", course_options, index=course_options.index(current_data['1st_choice']) if current_data['1st_choice'] in course_options else 0)
+            choice2 = st.selectbox("第2希望", course_options, index=course_options.index(current_data['2nd_choice']) if current_data['2nd_choice'] in course_options else 0)
+            bus = st.selectbox("バスの希望", bus_options, index=bus_options.index(current_data['bus']) if current_data['bus'] in bus_options else 0)
+            
+            allergy = st.radio("アレルギーの有無", ["なし", "あり"], index=["なし", "あり"].index(current_data['allergy']))
+            
+            allergy_details = st.text_area("アレルギーの詳細（ありの場合）", value=current_data['allergy_details'])
+            
+            submitted = st.form_submit_button("登録する")
+            
+            if submitted:
+                if choice1 == "未選択" or bus == "未選択":
+                    st.warning("第1希望とバスの希望は「未選択」以外を選んでください。")
+                elif choice1 == choice2 and choice1 != "未選択":
+                     st.warning("第1希望と第2希望は異なるコースを選択してください。")
+                else:
+                    add_trip_record(selected_employee_id, choice1, choice2, bus, allergy, allergy_details)
+                    st.success(f"{current_data['employee']}さんの希望を登録しました。")
+                    st.balloons()
 
-    df_results = pd.DataFrame(results_list)
+elif choice == "一覧（最新）":
+    st.header("職員別・最新の希望一覧")
+    st.info("各職員の最新の登録情報のみ表示しています。")
+    latest_trips = get_latest_trips()
+    
+    display_cols = [
+        'employee_id', 'employee', 'department_name', '1st_choice', 
+        '2nd_choice', 'bus', 'allergy', 'allergy_details', 'timestamp'
+    ]
+    # 存在しない列を除外
+    display_cols = [col for col in display_cols if col in latest_trips.columns]
 
-    # --- 画面表示 ---
-    st.subheader(f"総合評価")
-    max_score = len(items_flat) * 5
-    st.metric(label="合計平均点", value=f"{total_avg_score:.2f} / {max_score:.0f}")
-
-    st.subheader("評価詳細")
-    st.dataframe(df_results, hide_index=True)
-
-    st.subheader("考課者からのコメント")
-    for evaluator_name, comments in comments_by_evaluator.items():
-        with st.expander(f"考課者: {evaluator_name} からのコメント"):
-            for item, comment in comments.items():
-                if comment:
-                    st.markdown(f"**{item}**: {comment}")
-
-# --- 6. メインロジック ---
-def main():
-    """アプリケーションのメインコントローラー"""
-    initialize_session_state()
-
-    if not st.session_state.get("logged_in"):
-        login_screen()
+    if not latest_trips.empty:
+        st.dataframe(latest_trips[display_cols], use_container_width=True)
     else:
-        st.sidebar.title("メニュー")
-        st.sidebar.write(f"ようこそ、{st.session_state.user_name}さん")
+        st.info("データがありません。")
 
-        # 考課者権限があるかチェック
-        is_evaluator = any(st.session_state.user_id in v for v in st.session_state.evaluators_map.values())
-        
-        menu_options = ["あなたの評価"]
-        if is_evaluator:
-            menu_options.append("評価入力")
+elif choice == "一覧（全履歴）":
+    st.header("全登録履歴一覧")
+    st.info("過去の変更履歴を含む全てのデータを表示しています。")
+    all_trips = get_all_trips()
 
-        page = st.sidebar.radio("ページを選択", menu_options)
-        
-        if page == "あなたの評価":
-            show_my_evaluation_page()
-        elif page == "評価入力":
-            show_evaluation_input_page()
-        
-        if st.sidebar.button("ログアウト"):
-            # セッションをクリアしてログアウト
-            for key in list(st.session_state.keys()):
-                if key != 'initialized': # 初期化フラグ以外を消す
-                    del st.session_state[key]
-            st.rerun()
+    display_cols = [
+        'employee_id', 'employee', 'history_number', '1st_choice', 
+        'bus', 'allergy', 'timestamp'
+    ]
+    display_cols = [col for col in display_cols if col in all_trips.columns]
+    
+    if not all_trips.empty:
+        st.dataframe(all_trips[display_cols], use_container_width=True)
+    else:
+        st.info("データがありません。")
 
+elif choice == "印刷用リスト（基本）":
+    st.header("印刷用リスト（基本） - コース別・バス乗車リスト")
+    
+    latest_trips = get_latest_trips()
+    valid_trips = latest_trips[latest_trips['1st_choice'] != '未選択']
+    
+    if not valid_trips.empty:
+        grouped = valid_trips.groupby('1st_choice')
+        for name, group in grouped:
+            st.subheader(f"コース: {name} (計: {len(group)}名)")
+            display_data = group[['employee', 'department_name', 'bus']].rename(columns={
+                'employee': '氏名', 'department_name': '所属', 'bus': 'バス'
+            })
+            st.table(display_data.sort_values('bus').reset_index(drop=True))
+    else:
+        st.info("有効なデータがありません。")
+
+elif choice == "印刷用リスト（アレルギー情報付き）":
+    st.header("印刷用リスト（アレルギー情報付き）")
+    
+    latest_trips = get_latest_trips()
+    valid_trips = latest_trips[latest_trips['1st_choice'] != '未選択']
+
+    if not valid_trips.empty:
+        grouped = valid_trips.groupby('1st_choice')
+        for name, group in grouped:
+            st.subheader(f"コース: {name} (計: {len(group)}名)")
+            display_data = group[['employee', 'department_name', 'bus', 'allergy', 'allergy_details']].rename(columns={
+                'employee': '氏名', 'department_name': '所属', 'bus': 'バス', 'allergy': 'アレルギー', 'allergy_details': '詳細'
+            })
+            st.table(display_data.sort_values('bus').reset_index(drop=True))
+    else:
+        st.info("有効なデータがありません。")
+
+# --- アプリケーションの初期化 ---
 if __name__ == "__main__":
-    main()
+    init_db()
+    # メインの処理はStreamlitが自動的に行う
