@@ -2,9 +2,13 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 from datetime import datetime, time
+import pytz # Import pytz for timezone handling
 
 # --- データベース設定 ---
 DB_FILE = "day_log.db"
+
+# Define Japan Standard Time (JST)
+JST = pytz.timezone('Asia/Tokyo')
 
 def get_db_connection():
     """データベース接続を取得する"""
@@ -244,7 +248,9 @@ def show_log_list_page():
     """日誌一覧ページ"""
     st.header("日誌一覧")
     
-    log_date = st.date_input("対象日を選択", datetime.today())
+    # Get current date in JST
+    current_jst_date = datetime.now(JST).date()
+    log_date = st.date_input("対象日を選択", current_jst_date)
     weekday_map = {0: "月", 1: "火", 2: "水", 3: "木", 4: "金", 5: "土", 6: "日"}
     selected_weekday = weekday_map[log_date.weekday()]
     st.info(f"{log_date.strftime('%Y年%m月%d日')} は **{selected_weekday}曜日** です。")
@@ -341,9 +347,12 @@ def show_log_input_page():
     staff = get_staff_list()
     staff_options = {s['id']: s['name'] for s in staff}
     
+    # Get current date in JST
+    current_jst_date = datetime.now(JST).date()
+
     # Pre-select user and date if coming from log list
     initial_user_id = st.session_state.get('selected_user_id_for_log', None)
-    initial_log_date = st.session_state.get('selected_log_date', datetime.today())
+    initial_log_date = st.session_state.get('selected_log_date', current_jst_date)
 
     c1, c2 = st.columns(2)
 
@@ -529,9 +538,13 @@ def show_excretion_page():
     if None not in staff_options:
         staff_options[None] = "なし" 
 
+    # Get current date and time in JST
+    current_jst_date = datetime.now(JST).date()
+    current_jst_time = datetime.now(JST).time()
+
     # Pre-select user and date if coming from log list
     initial_user_id = st.session_state.get('selected_user_id_for_excretion', None)
-    initial_log_date = st.session_state.get('selected_log_date', datetime.today())
+    initial_log_date = st.session_state.get('selected_log_date', current_jst_date)
 
     c1, c2 = st.columns(2)
 
@@ -558,7 +571,7 @@ def show_excretion_page():
             st.write(f"##### {user_options[selected_user_id]}さんの排泄記録")
             
             c1, c2 = st.columns(2)
-            excretion_time = c1.time_input("排泄時間", value=datetime.now().time())
+            excretion_time = c1.time_input("排泄時間", value=current_jst_time)
             excretion_type = c2.selectbox("分類", ["尿", "便"], index=None) # Start with no default selection
             
             c1, c2 = st.columns(2)
@@ -627,9 +640,12 @@ def show_absence_page():
     staff = get_staff_list()
     staff_options = {s['id']: s['name'] for s in staff}
 
+    # Get current date in JST
+    current_jst_date = datetime.now(JST).date()
+
     # Pre-select user if coming from log list
     initial_user_id = st.session_state.get('selected_user_id_for_absence', None)
-    initial_log_date = st.session_state.get('selected_log_date', datetime.today())
+    initial_log_date = st.session_state.get('selected_log_date', current_jst_date)
 
     # Safely determine the index for the user selectbox
     selected_user_index = None
