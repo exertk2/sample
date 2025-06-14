@@ -1,66 +1,531 @@
 import streamlit as st
+import sqlite3
 import pandas as pd
-import numpy as np
+from datetime import datetime, time
 
-st.title('製品評価データのグラフ化')
+# --- データベース設定 ---
+DB_FILE = "day_log.db"
 
-st.write("""
-このアプリケーションは、架空の製品評価データを生成し、
-それを棒グラフと折れ線グラフで視覚化します。
-""")
+def get_db_connection():
+    """データベース接続を取得する"""
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-# 1. 評価データの生成
-# 製品A, B, Cの3ヶ月間の評価点（1〜5点）を想定
-products = ['製品A', '製品B', '製品C']
-months = ['1月', '2月', '3月']
+def create_tables():
+    """アプリケーションに必要なテーブルを作成する"""
+    conn = get_db_connection()
+    c = conn.cursor()
 
-data = {
-    '製品': np.repeat(products, len(months)),
-    '月': np.tile(months, len(products)),
-    '評価点': np.random.randint(1, 6, size=len(products) * len(months)) # 1から5までのランダムな整数
-}
-df = pd.DataFrame(data)
+    # 職員テーブル
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS staff (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            department TEXT DEFAULT '通所支援Ⅰ係'
+        )
+    ''')
 
-st.subheader('評価データテーブル')
-st.dataframe(df)
+    # 利用者テーブル
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_code INTEGER UNIQUE,
+            name TEXT NOT NULL,
+            kana TEXT,
+            birthday DATE,
+            gender TEXT,
+            patient_category TEXT,
+            is_active BOOLEAN,
+            start_date DATE,
+            end_date DATE,
+            use_days TEXT, -- "月,火,水" のようにカンマ区切りで保存
+            medication_days TEXT,
+            bath_days TEXT
+        )
+    ''')
 
-# 2. 製品ごとの平均評価点を計算
-st.subheader('製品ごとの平均評価点')
-avg_ratings = df.groupby('製品')['評価点'].mean().reset_index()
-st.dataframe(avg_ratings)
+    # 日誌テーブル
+    # 簡単化のため、仕様書の複数項目を1つのテーブルに統合
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS daily_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            log_date DATE,
+            is_absent BOOLEAN DEFAULT 0,
+            temperature REAL,
+            pulse INTEGER,
+            spo2 INTEGER,
+            bp_high INTEGER,
+            bp_low INTEGER,
+            medication_check BOOLEAN,
+            medication_staff_id INTEGER,
+            bath_check BOOLEAN,
+            bath_start_time TIME,
+            bath_start_staff_id INTEGER,
+            bath_end_time TIME,
+            bath_end_staff_id INTEGER,
+            oral_care_check BOOLEAN,
+            oral_care_staff_id INTEGER,
+            weight REAL,
+            health_notes TEXT,
+            memo1 TEXT,
+            memo2 TEXT,
+            UNIQUE(user_id, log_date),
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (medication_staff_id) REFERENCES staff (id),
+            FOREIGN KEY (bath_start_staff_id) REFERENCES staff (id),
+            FOREIGN KEY (bath_end_staff_id) REFERENCES staff (id),
+            FOREIGN KEY (oral_care_staff_id) REFERENCES staff (id)
+        )
+    ''')
+    
+    # 排泄記録テーブル
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS excretions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            log_id INTEGER,
+            excretion_time TIME,
+            type TEXT,
+            staff1_id INTEGER,
+            staff2_id INTEGER,
+            notes TEXT,
+            FOREIGN KEY (log_id) REFERENCES daily_logs (id),
+            FOREIGN KEY (staff1_id) REFERENCES staff (id),
+            FOREIGN KEY (staff2_id) REFERENCES staff (id)
+        )
+    ''')
+    
+    # 欠席記録テーブル（仕様が複雑なため主要項目のみ実装）
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS absences (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            reception_date DATE,
+            reception_staff_id INTEGER,
+            contact_person TEXT,
+            absence_start_date DATE,
+            absence_end_date DATE,
+            reason TEXT, -- 簡略化のためテキストエリアで一括入力
+            support_content TEXT, -- 簡略化のためテキストエリアで一括入力
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (reception_staff_id) REFERENCES staff (id)
+        )
+    ''')
 
-# 3. 棒グラフで製品ごとの平均評価点を表示
-st.write('#### 製品ごとの平均評価点の棒グラフ')
-st.bar_chart(avg_ratings.set_index('製品'))
 
-# 4. 月ごとの製品評価の推移
-st.subheader('月ごとの製品評価推移')
+    conn.commit()
+    conn.close()
 
-# ピボットテーブルを作成して、月をインデックス、製品をカラムにする
-pivot_df = df.pivot_table(index='月', columns='製品', values='評価点')
-st.dataframe(pivot_df)
+# --- データベース操作関数 ---
 
-# 5. 折れ線グラフで月ごとの評価推移を表示
-st.write('#### 月ごとの製品評価推移の折れ線グラフ')
-st.line_chart(pivot_df)
+def get_staff_list():
+    """職員リストを取得する"""
+    conn = get_db_connection()
+    staff = conn.execute('SELECT id, name FROM staff ORDER BY name').fetchall()
+    conn.close()
+    return staff
 
-st.write("""
-**グラフの読み方:**
-* **棒グラフ:** 各製品が平均してどのくらいの評価を得ているかを示します。
-* **折れ線グラフ:** 各製品の評価が時間（月）とともにどのように変化したかを示します。
-""")
+def get_user_list():
+    """利用者リストを取得する"""
+    conn = get_db_connection()
+    users = conn.execute('SELECT id, name FROM users WHERE is_active = 1 ORDER BY kana').fetchall()
+    conn.close()
+    return users
 
-# 追加のインタラクション（オプション）
-st.sidebar.subheader('評価点のフィルタリング')
-min_rating = st.sidebar.slider(
-    '表示する最低評価点',
-    min_value=1,
-    max_value=5,
-    value=3
-)
-filtered_df = df[df['評価点'] >= min_rating]
-st.sidebar.write(f'評価点が{min_rating}点以上のデータ数: {len(filtered_df)}')
-st.sidebar.dataframe(filtered_df)
+def get_user_by_id(user_id):
+    """IDで利用者情報を取得する"""
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+    conn.close()
+    return user
 
-st.sidebar.write("---")
-st.sidebar.info("このアプリはデモンストレーション用です。")
+def get_or_create_log_id(user_id, log_date):
+    """指定日の日誌レコードを取得または作成し、そのIDを返す"""
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('SELECT id FROM daily_logs WHERE user_id = ? AND log_date = ?', (user_id, log_date))
+    log = c.fetchone()
+    if log:
+        log_id = log['id']
+    else:
+        c.execute('INSERT INTO daily_logs (user_id, log_date) VALUES (?, ?)', (user_id, log_date))
+        conn.commit()
+        log_id = c.lastrowid
+    conn.close()
+    return log_id
+
+
+# --- UI表示関数 ---
+
+def show_staff_page():
+    """職員一覧・登録ページ"""
+    st.header("職員一覧・登録")
+
+    with st.form("new_staff_form", clear_on_submit=True):
+        st.write("##### 新規職員登録")
+        new_staff_name = st.text_input("職員氏名")
+        submitted = st.form_submit_button("登録")
+        if submitted and new_staff_name:
+            try:
+                conn = get_db_connection()
+                conn.execute('INSERT INTO staff (name) VALUES (?)', (new_staff_name,))
+                conn.commit()
+                conn.close()
+                st.success(f"{new_staff_name}さんを登録しました。")
+            except sqlite3.IntegrityError:
+                st.error("この職員は既に登録されています。")
+
+    st.write("---")
+    st.write("##### 登録済み職員")
+    staff_df = pd.read_sql("SELECT name AS '氏名', department AS '所属' FROM staff WHERE department = '通所支援Ⅰ係' ORDER BY name", get_db_connection())
+    st.dataframe(staff_df, use_container_width=True)
+
+
+def show_user_info_page():
+    """利用者情報登録ページ"""
+    st.header("利用者情報登録")
+
+    days_of_week = ["月", "火", "水", "木", "金", "土", "日"]
+    
+    with st.form("user_info_form"):
+        st.write("##### 利用者情報を入力してください")
+        
+        c1, c2 = st.columns(2)
+        user_code = c1.number_input("利用者コード", step=1, format="%d")
+        name = c2.text_input("氏名 *")
+        kana = c1.text_input("フリガナ")
+        birthday = c2.date_input("生年月日", value=None)
+        
+        gender = c1.selectbox("性別", ["男", "女", "その他"], index=None)
+        patient_category = c2.selectbox("患者区分", ["たんぽぽ", "ゆり", "さくら", "すみれ", "なのはな", "療護", "外来"], index=None)
+
+        is_active = st.checkbox("在籍中", value=True)
+        c1, c2 = st.columns(2)
+        start_date = c1.date_input("利用開始日", value=None)
+        end_date = c2.date_input("退所年月日", value=None)
+        
+        st.write("利用曜日")
+        use_days_cols = st.columns(7)
+        use_days_selected = [col.checkbox(day, key=f"use_{day}") for col, day in zip(use_days_cols, days_of_week)]
+
+        # 内服・入浴の曜日は仕様書にあるが、ここでは省略してチェックボックスのみ
+        st.write("---")
+        medication_needed = st.checkbox("内服あり")
+        bath_needed = st.checkbox("入浴あり")
+        
+        submitted = st.form_submit_button("登録する")
+
+        if submitted:
+            if not name:
+                st.error("氏名は必須です。")
+            else:
+                use_days_str = ",".join([day for day, selected in zip(days_of_week, use_days_selected) if selected])
+                # 簡単化のため、内服・入浴曜日は保存しない
+                
+                try:
+                    conn = get_db_connection()
+                    conn.execute('''
+                        INSERT INTO users (user_code, name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (user_code, name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days_str))
+                    conn.commit()
+                    conn.close()
+                    st.success(f"{name}さんの情報を登録しました。")
+                except sqlite3.IntegrityError:
+                    st.error("その利用者コードは既に使用されています。")
+                except Exception as e:
+                    st.error(f"登録中にエラーが発生しました: {e}")
+
+def show_log_list_page():
+    """日誌一覧ページ"""
+    st.header("日誌一覧")
+    
+    log_date = st.date_input("対象日を選択", datetime.today())
+    weekday_map = {0: "月", 1: "火", 2: "水", 3: "木", 4: "金", 5: "土", 6: "日"}
+    selected_weekday = weekday_map[log_date.weekday()]
+    st.info(f"{log_date.strftime('%Y年%m月%d日')} は **{selected_weekday}曜日** です。")
+
+    conn = get_db_connection()
+    # 利用曜日に基づいて利用者をフィルタリング
+    query = f"SELECT id, name FROM users WHERE is_active = 1 AND use_days LIKE '%{selected_weekday}%' ORDER BY kana"
+    today_users = conn.execute(query).fetchall()
+    conn.close()
+    
+    st.write("---")
+    
+    if not today_users:
+        st.warning("本日の利用予定者はいません。")
+    else:
+        st.write(f"##### {len(today_users)}名の利用予定者")
+        # DataFrameで表示
+        df_data = []
+        for user in today_users:
+            df_data.append({"利用者ID": user["id"], "氏名": user["name"]})
+        
+        df = pd.DataFrame(df_data)
+        
+        # 各種ボタンを列として追加（ここでは機能せずUIのみ）
+        df["日誌入力"] = "✏️"
+        df["排泄入力"] = "🚽"
+        df["欠席入力"] = "❌"
+        
+        st.info("💡各行のボタンをクリックして入力画面に移動します。（このプロトタイプではボタンは動作しません）")
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+
+    st.write("---")
+    with st.expander("臨時利用者の追加"):
+        users = get_user_list()
+        user_options = {user['id']: user['name'] for user in users}
+        
+        selected_user_id = st.selectbox(
+            "臨時で利用する利用者を選択",
+            options=list(user_options.keys()),
+            format_func=lambda x: user_options[x],
+            index=None
+        )
+        if st.button("臨時利用を追加"):
+            if selected_user_id:
+                st.success(f"{user_options[selected_user_id]}さんを臨時利用者として追加しました。（表示への反映は未実装）")
+
+
+def show_log_input_page():
+    """日誌入力ページ"""
+    st.header("日誌入力")
+
+    users = get_user_list()
+    user_options = {user['id']: user['name'] for user in users}
+    
+    staff = get_staff_list()
+    staff_options = {s['id']: s['name'] for s in staff}
+    
+    c1, c2 = st.columns(2)
+    selected_user_id = c1.selectbox(
+        "利用者を選択",
+        options=list(user_options.keys()),
+        format_func=lambda x: user_options.get(x, "選択してください"),
+        index=None
+    )
+    log_date = c2.date_input("利用日", datetime.today())
+
+    if selected_user_id and log_date:
+        st.subheader(f"{user_options[selected_user_id]}さんの日誌 ({log_date.strftime('%Y/%m/%d')})")
+        
+        log_id = get_or_create_log_id(selected_user_id, log_date)
+        
+        # 既存データを読み込む（未実装）
+        # log_data = get_log_data(log_id)
+
+        with st.form("log_input_form"):
+            is_absent = st.checkbox("欠席")
+            
+            st.write("---")
+            st.write("##### バイタル")
+            c1, c2, c3, c4, c5 = st.columns(5)
+            temperature = c1.number_input("体温", min_value=30.0, max_value=45.0, step=0.1, format="%.1f")
+            pulse = c2.number_input("脈", min_value=0, max_value=200, step=1)
+            spo2 = c3.number_input("SPO2", min_value=0, max_value=100, step=1)
+            bp_high = c4.number_input("最高血圧", min_value=0, max_value=300, step=1)
+            bp_low = c5.number_input("最低血圧", min_value=0, max_value=200, step=1)
+            weight = c1.number_input("体重", min_value=0.0, max_value=200.0, step=0.1, format="%.1f")
+
+            st.write("---")
+            st.write("##### 内服・口腔ケア")
+            c1, c2 = st.columns(2)
+            medication_check = c1.checkbox("内服実施")
+            medication_staff_id = c2.selectbox("内服実施職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None)
+            
+            c1, c2 = st.columns(2)
+            oral_care_check = c1.checkbox("口腔ケア実施")
+            oral_care_staff_id = c2.selectbox("口腔ケア実施職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None)
+
+            st.write("---")
+            st.write("##### 入浴")
+            bath_check = st.checkbox("入浴実施")
+            c1, c2, c3, c4 = st.columns(4)
+            bath_start_time = c1.time_input("入浴開始時間")
+            bath_start_staff_id = c2.selectbox("開始記録職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None, key="bath_start_staff")
+            bath_end_time = c3.time_input("入浴終了時間")
+            bath_end_staff_id = c4.selectbox("終了記録職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None, key="bath_end_staff")
+
+            st.write("---")
+            health_notes = st.text_area("特記（体調面）")
+            memo1 = st.text_area("その他１")
+            memo2 = st.text_area("その他２")
+
+            submitted = st.form_submit_button("日誌を保存")
+            if submitted:
+                conn = get_db_connection()
+                conn.execute('''
+                    UPDATE daily_logs 
+                    SET is_absent=?, temperature=?, pulse=?, spo2=?, bp_high=?, bp_low=?, 
+                        medication_check=?, medication_staff_id=?, bath_check=?, bath_start_time=?, 
+                        bath_start_staff_id=?, bath_end_time=?, bath_end_staff_id=?, oral_care_check=?, 
+                        oral_care_staff_id=?, weight=?, health_notes=?, memo1=?, memo2=?
+                    WHERE id = ?
+                ''', (is_absent, temperature, pulse, spo2, bp_high, bp_low, 
+                      medication_check, medication_staff_id, bath_check, bath_start_time, 
+                      bath_start_staff_id, bath_end_time, bath_end_staff_id, oral_care_check,
+                      oral_care_staff_id, weight, health_notes, memo1, memo2, log_id))
+                conn.commit()
+                conn.close()
+                st.success("日誌を保存しました。")
+    else:
+        st.info("利用者と利用日を選択してください。")
+
+def show_excretion_page():
+    """排泄入力ページ"""
+    st.header("排泄入力")
+    
+    users = get_user_list()
+    user_options = {user['id']: user['name'] for user in users}
+    
+    staff = get_staff_list()
+    staff_options = {s['id']: s['name'] for s in staff}
+    staff_options[None] = "なし" # 職員2用にNoneを追加
+
+    c1, c2 = st.columns(2)
+    selected_user_id = c1.selectbox(
+        "利用者を選択",
+        options=list(user_options.keys()),
+        format_func=lambda x: user_options.get(x),
+        index=None
+    )
+    log_date = c2.date_input("利用日", datetime.today())
+    
+    if selected_user_id and log_date:
+        log_id = get_or_create_log_id(selected_user_id, log_date)
+        
+        with st.form("excretion_form"):
+            st.write(f"##### {user_options[selected_user_id]}さんの排泄記録")
+            
+            c1, c2 = st.columns(2)
+            excretion_time = c1.time_input("排泄時間")
+            excretion_type = c2.selectbox("分類", ["尿", "便"], index=None)
+            
+            c1, c2 = st.columns(2)
+            staff1_id = c1.selectbox("排泄介助職員1", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None)
+            staff2_id = c2.selectbox("排泄介助職員2", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None)
+            
+            notes = st.text_area("特記事項（体調面）")
+            
+            submitted = st.form_submit_button("記録を追加")
+            
+            if submitted:
+                if excretion_type and staff1_id:
+                    conn = get_db_connection()
+                    conn.execute(
+                        'INSERT INTO excretions (log_id, excretion_time, type, staff1_id, staff2_id, notes) VALUES (?, ?, ?, ?, ?, ?)',
+                        (log_id, excretion_time, excretion_type, staff1_id, staff2_id, notes)
+                    )
+                    conn.commit()
+                    conn.close()
+                    st.success("排泄記録を追加しました。")
+                else:
+                    st.error("分類と介助職員1は必須です。")
+
+        # 記録一覧の表示
+        st.write("---")
+        st.write("##### 本日の記録一覧")
+        conn = get_db_connection()
+        records_df = pd.read_sql_query(f'''
+            SELECT 
+                e.excretion_time AS '時間',
+                e.type AS '分類',
+                s1.name AS '介助職員1',
+                s2.name AS '介助職員2',
+                e.notes AS '特記事項'
+            FROM excretions e
+            LEFT JOIN staff s1 ON e.staff1_id = s1.id
+            LEFT JOIN staff s2 ON e.staff2_id = s2.id
+            WHERE e.log_id = {log_id}
+            ORDER BY e.excretion_time
+        ''', conn)
+        conn.close()
+        st.dataframe(records_df, use_container_width=True)
+
+def show_absence_page():
+    """欠席入力ページ"""
+    st.header("欠席入力")
+    st.warning("このページは現在開発中です。基本的なフォームのみ表示されます。")
+
+    users = get_user_list()
+    user_options = {user['id']: user['name'] for user in users}
+    
+    staff = get_staff_list()
+    staff_options = {s['id']: s['name'] for s in staff}
+
+    selected_user_id = st.selectbox(
+        "欠席者を選択",
+        options=list(user_options.keys()),
+        format_func=lambda x: user_options.get(x),
+        index=None
+    )
+
+    if selected_user_id:
+        with st.form("absence_form"):
+            st.write(f"##### {user_options[selected_user_id]}さんの欠席情報")
+            c1, c2 = st.columns(2)
+            reception_staff_id = c1.selectbox("受付職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None)
+            reception_date = c2.date_input("受付日", datetime.today())
+
+            contact_person = st.text_input("欠席の連絡者")
+            
+            c1, c2 = st.columns(2)
+            absence_start_date = c1.date_input("欠席期間（開始）")
+            absence_end_date = c2.date_input("欠席期間（終了）")
+            
+            reason = st.text_area("欠席理由（詳細を記入）", help="例：本人の体調不良（発熱38.0℃、咳あり）のため。")
+            support = st.text_area("援助内容（詳細を記入）", help="例：体調確認、医療機関の受診を勧めた。")
+
+            submitted = st.form_submit_button("欠席情報を登録")
+            if submitted:
+                # データベースへの保存処理（簡略版）
+                conn = get_db_connection()
+                conn.execute('''
+                    INSERT INTO absences (user_id, reception_date, reception_staff_id, contact_person, absence_start_date, absence_end_date, reason, support_content)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (selected_user_id, reception_date, reception_staff_id, contact_person, absence_start_date, absence_end_date, reason, support))
+                conn.commit()
+                conn.close()
+                st.success("欠席情報を登録しました。")
+
+
+# --- メインのアプリケーション実行部分 ---
+def main():
+    """メイン関数"""
+    create_tables() # データベースとテーブルの存在確認・作成
+
+    st.set_page_config(page_title="通所日誌アプリ", layout="wide")
+    st.sidebar.title("メニュー")
+
+    # セッション状態でページを管理
+    if 'page' not in st.session_state:
+        st.session_state.page = "日誌一覧"
+
+    menu_options = ["日誌一覧", "日誌入力", "排泄入力", "欠席入力", "利用者情報登録", "職員一覧"]
+    
+    # サイドバーのボタンでページを切り替える
+    for option in menu_options:
+        if st.sidebar.button(option):
+            st.session_state.page = option
+    
+    # 選択されたページを表示
+    page = st.session_state.page
+    
+    if page == "日誌一覧":
+        show_log_list_page()
+    elif page == "日誌入力":
+        show_log_input_page()
+    elif page == "排泄入力":
+        show_excretion_page()
+    elif page == "欠席入力":
+        show_absence_page()
+    elif page == "利用者情報登録":
+        show_user_info_page()
+    elif page == "職員一覧":
+        show_staff_page()
+
+if __name__ == "__main__":
+    main()
