@@ -144,12 +144,15 @@ def get_or_create_log_id(user_id, log_date):
     """指定日の日誌レコードを取得または作成し、そのIDを返す"""
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute('SELECT id FROM daily_logs WHERE user_id = ? AND log_date = ?', (user_id, log_date))
+    # Ensure log_date is in 'YYYY-MM-DD' format for database query
+    log_date_str = log_date.strftime('%Y-%m-%d') if isinstance(log_date, datetime) or isinstance(log_date, pd.Timestamp) else log_date
+    
+    c.execute('SELECT id FROM daily_logs WHERE user_id = ? AND log_date = ?', (user_id, log_date_str))
     log = c.fetchone()
     if log:
         log_id = log['id']
     else:
-        c.execute('INSERT INTO daily_logs (user_id, log_date) VALUES (?, ?)', (user_id, log_date))
+        c.execute('INSERT INTO daily_logs (user_id, log_date) VALUES (?, ?)', (user_id, log_date_str))
         conn.commit()
         log_id = c.lastrowid
     conn.close()
@@ -258,36 +261,67 @@ def show_log_list_page():
         st.warning("本日の利用予定者はいません。")
     else:
         st.write(f"##### {len(today_users)}名の利用予定者")
-        # DataFrameで表示
-        df_data = []
+        
+        # Create columns for display and buttons
+        cols = st.columns([0.5, 0.2, 0.1, 0.1, 0.1])
+        cols[0].write("**氏名**")
+        cols[1].write("**日誌**")
+        cols[2].write("**排泄**")
+        cols[3].write("**欠席**")
+        
         for user in today_users:
-            df_data.append({"利用者ID": user["id"], "氏名": user["name"]})
-        
-        df = pd.DataFrame(df_data)
-        
-        # 各種ボタンを列として追加（ここでは機能せずUIのみ）
-        df["日誌入力"] = "✏️"
-        df["排泄入力"] = "🚽"
-        df["欠席入力"] = "❌"
-        
-        st.info("💡各行のボタンをクリックして入力画面に移動します。（このプロトタイプではボタンは動作しません）")
-        st.dataframe(df, use_container_width=True, hide_index=True)
-
+            user_id = user["id"]
+            user_name = user["name"]
+            
+            col_name, col_log, col_excretion, col_absence = st.columns([0.5, 0.2, 0.1, 0.1])
+            
+            col_name.write(user_name)
+            
+            # Daily Log button
+            if col_log.button("✏️", key=f"log_{user_id}"):
+                st.session_state.page = "日誌入力"
+                st.session_state.selected_user_id_for_log = user_id
+                st.session_state.selected_log_date = log_date
+                st.experimental_rerun()
+            
+            # Excretion button
+            if col_excretion.button("🚽", key=f"excretion_{user_id}"):
+                st.session_state.page = "排泄入力"
+                st.session_state.selected_user_id_for_excretion = user_id
+                st.session_state.selected_log_date = log_date
+                st.experimental_rerun()
+                
+            # Absence button
+            if col_absence.button("❌", key=f"absence_{user_id}"):
+                st.session_state.page = "欠席入力"
+                st.session_state.selected_user_id_for_absence = user_id
+                st.session_state.selected_log_date = log_date # Absence page primarily uses selected_user_id, but passing log_date for consistency if needed later
+                st.experimental_rerun()
 
     st.write("---")
     with st.expander("臨時利用者の追加"):
         users = get_user_list()
         user_options = {user['id']: user['name'] for user in users}
         
-        selected_user_id = st.selectbox(
+        selected_user_id_temp = st.selectbox(
             "臨時で利用する利用者を選択",
             options=list(user_options.keys()),
             format_func=lambda x: user_options[x],
-            index=None
+            index=None,
+            key="temp_user_select"
         )
-        if st.button("臨時利用を追加"):
-            if selected_user_id:
-                st.success(f"{user_options[selected_user_id]}さんを臨時利用者として追加しました。（表示への反映は未実装）")
+        if st.button("臨時利用を追加", key="add_temp_user_btn"):
+            if selected_user_id_temp:
+                # For temporary users, we might want to automatically create a log entry if they don't have one
+                # and then perhaps redirect to the daily log page for them.
+                # Here, just a success message for simplicity.
+                get_or_create_log_id(selected_user_id_temp, log_date)
+                st.success(f"{user_options[selected_user_id_temp]}さんを臨時利用者として追加しました。（日誌エントリを作成済み）")
+                # Option to redirect:
+                # st.session_state.page = "日誌入力"
+                # st.session_state.selected_user_id_for_log = selected_user_id_temp
+                # st.session_state.selected_log_date = log_date
+                # st.experimental_rerun()
 
 
 def show_log_input_page():
@@ -300,59 +334,93 @@ def show_log_input_page():
     staff = get_staff_list()
     staff_options = {s['id']: s['name'] for s in staff}
     
+    # Pre-select user and date if coming from log list
+    initial_user_id = st.session_state.get('selected_user_id_for_log', None)
+    initial_log_date = st.session_state.get('selected_log_date', datetime.today())
+
     c1, c2 = st.columns(2)
     selected_user_id = c1.selectbox(
         "利用者を選択",
         options=list(user_options.keys()),
         format_func=lambda x: user_options.get(x, "選択してください"),
-        index=None
+        index=list(user_options.keys()).index(initial_user_id) if initial_user_id in user_options else None
     )
-    log_date = c2.date_input("利用日", datetime.today())
+    log_date = c2.date_input("利用日", initial_log_date)
 
     if selected_user_id and log_date:
         st.subheader(f"{user_options[selected_user_id]}さんの日誌 ({log_date.strftime('%Y/%m/%d')})")
         
         log_id = get_or_create_log_id(selected_user_id, log_date)
         
-        # 既存データを読み込む（未実装）
-        # log_data = get_log_data(log_id)
+        # 既存データを読み込む
+        conn = get_db_connection()
+        log_data = conn.execute('SELECT * FROM daily_logs WHERE id = ?', (log_id,)).fetchone()
+        conn.close()
 
         with st.form("log_input_form"):
-            is_absent = st.checkbox("欠席")
+            # Populate form with existing data
+            is_absent = st.checkbox("欠席", value=log_data['is_absent'] if log_data else False)
             
             st.write("---")
             st.write("##### バイタル")
             c1, c2, c3, c4, c5 = st.columns(5)
-            temperature = c1.number_input("体温", min_value=30.0, max_value=45.0, step=0.1, format="%.1f")
-            pulse = c2.number_input("脈", min_value=0, max_value=200, step=1)
-            spo2 = c3.number_input("SPO2", min_value=0, max_value=100, step=1)
-            bp_high = c4.number_input("最高血圧", min_value=0, max_value=300, step=1)
-            bp_low = c5.number_input("最低血圧", min_value=0, max_value=200, step=1)
-            weight = c1.number_input("体重", min_value=0.0, max_value=200.0, step=0.1, format="%.1f")
+            temperature = c1.number_input("体温", min_value=30.0, max_value=45.0, step=0.1, format="%.1f", value=log_data['temperature'] if log_data and log_data['temperature'] else 36.5)
+            pulse = c2.number_input("脈", min_value=0, max_value=200, step=1, value=log_data['pulse'] if log_data and log_data['pulse'] else 70)
+            spo2 = c3.number_input("SPO2", min_value=0, max_value=100, step=1, value=log_data['spo2'] if log_data and log_data['spo2'] else 98)
+            bp_high = c4.number_input("最高血圧", min_value=0, max_value=300, step=1, value=log_data['bp_high'] if log_data and log_data['bp_high'] else 120)
+            bp_low = c5.number_input("最低血圧", min_value=0, max_value=200, step=1, value=log_data['bp_low'] if log_data and log_data['bp_low'] else 80)
+            weight = c1.number_input("体重", min_value=0.0, max_value=200.0, step=0.1, format="%.1f", value=log_data['weight'] if log_data and log_data['weight'] else 50.0)
 
             st.write("---")
             st.write("##### 内服・口腔ケア")
             c1, c2 = st.columns(2)
-            medication_check = c1.checkbox("内服実施")
-            medication_staff_id = c2.selectbox("内服実施職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None)
+            medication_check = c1.checkbox("内服実施", value=log_data['medication_check'] if log_data else False)
+            medication_staff_id = c2.selectbox(
+                "内服実施職員", 
+                options=list(staff_options.keys()), 
+                format_func=lambda x: staff_options.get(x), 
+                index=list(staff_options.keys()).index(log_data['medication_staff_id']) if log_data and log_data['medication_staff_id'] in staff_options else None
+            )
             
             c1, c2 = st.columns(2)
-            oral_care_check = c1.checkbox("口腔ケア実施")
-            oral_care_staff_id = c2.selectbox("口腔ケア実施職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None)
+            oral_care_check = c1.checkbox("口腔ケア実施", value=log_data['oral_care_check'] if log_data else False)
+            oral_care_staff_id = c2.selectbox(
+                "口腔ケア実施職員", 
+                options=list(staff_options.keys()), 
+                format_func=lambda x: staff_options.get(x), 
+                index=list(staff_options.keys()).index(log_data['oral_care_staff_id']) if log_data and log_data['oral_care_staff_id'] in staff_options else None
+            )
 
             st.write("---")
             st.write("##### 入浴")
-            bath_check = st.checkbox("入浴実施")
+            bath_check = st.checkbox("入浴実施", value=log_data['bath_check'] if log_data else False)
             c1, c2, c3, c4 = st.columns(4)
-            bath_start_time = c1.time_input("入浴開始時間")
-            bath_start_staff_id = c2.selectbox("開始記録職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None, key="bath_start_staff")
-            bath_end_time = c3.time_input("入浴終了時間")
-            bath_end_staff_id = c4.selectbox("終了記録職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None, key="bath_end_staff")
+            
+            # Convert stored time string to datetime.time object for time_input
+            bath_start_time_val = datetime.strptime(log_data['bath_start_time'], '%H:%M:%S').time() if log_data and log_data['bath_start_time'] else time(9, 0)
+            bath_end_time_val = datetime.strptime(log_data['bath_end_time'], '%H:%M:%S').time() if log_data and log_data['bath_end_time'] else time(10, 0)
+
+            bath_start_time = c1.time_input("入浴開始時間", value=bath_start_time_val)
+            bath_start_staff_id = c2.selectbox(
+                "開始記録職員", 
+                options=list(staff_options.keys()), 
+                format_func=lambda x: staff_options.get(x), 
+                index=list(staff_options.keys()).index(log_data['bath_start_staff_id']) if log_data and log_data['bath_start_staff_id'] in staff_options else None, 
+                key="bath_start_staff"
+            )
+            bath_end_time = c3.time_input("入浴終了時間", value=bath_end_time_val)
+            bath_end_staff_id = c4.selectbox(
+                "終了記録職員", 
+                options=list(staff_options.keys()), 
+                format_func=lambda x: staff_options.get(x), 
+                index=list(staff_options.keys()).index(log_data['bath_end_staff_id']) if log_data and log_data['bath_end_staff_id'] in staff_options else None, 
+                key="bath_end_staff"
+            )
 
             st.write("---")
-            health_notes = st.text_area("特記（体調面）")
-            memo1 = st.text_area("その他１")
-            memo2 = st.text_area("その他２")
+            health_notes = st.text_area("特記（体調面）", value=log_data['health_notes'] if log_data else "")
+            memo1 = st.text_area("その他１", value=log_data['memo1'] if log_data else "")
+            memo2 = st.text_area("その他２", value=log_data['memo2'] if log_data else "")
 
             submitted = st.form_submit_button("日誌を保存")
             if submitted:
@@ -365,8 +433,10 @@ def show_log_input_page():
                         oral_care_staff_id=?, weight=?, health_notes=?, memo1=?, memo2=?
                     WHERE id = ?
                 ''', (is_absent, temperature, pulse, spo2, bp_high, bp_low, 
-                      medication_check, medication_staff_id, bath_check, bath_start_time, 
-                      bath_start_staff_id, bath_end_time, bath_end_staff_id, oral_care_check,
+                      medication_check, medication_staff_id, 
+                      bath_check, bath_start_time.strftime('%H:%M:%S') if bath_start_time else None, # Store time as string
+                      bath_start_staff_id, bath_end_time.strftime('%H:%M:%S') if bath_end_time else None, # Store time as string
+                      bath_end_staff_id, oral_care_check,
                       oral_care_staff_id, weight, health_notes, memo1, memo2, log_id))
                 conn.commit()
                 conn.close()
@@ -385,14 +455,18 @@ def show_excretion_page():
     staff_options = {s['id']: s['name'] for s in staff}
     staff_options[None] = "なし" # 職員2用にNoneを追加
 
+    # Pre-select user and date if coming from log list
+    initial_user_id = st.session_state.get('selected_user_id_for_excretion', None)
+    initial_log_date = st.session_state.get('selected_log_date', datetime.today())
+
     c1, c2 = st.columns(2)
     selected_user_id = c1.selectbox(
         "利用者を選択",
         options=list(user_options.keys()),
         format_func=lambda x: user_options.get(x),
-        index=None
+        index=list(user_options.keys()).index(initial_user_id) if initial_user_id in user_options else None
     )
-    log_date = c2.date_input("利用日", datetime.today())
+    log_date = c2.date_input("利用日", initial_log_date)
     
     if selected_user_id and log_date:
         log_id = get_or_create_log_id(selected_user_id, log_date)
@@ -401,12 +475,12 @@ def show_excretion_page():
             st.write(f"##### {user_options[selected_user_id]}さんの排泄記録")
             
             c1, c2 = st.columns(2)
-            excretion_time = c1.time_input("排泄時間")
+            excretion_time = c1.time_input("排泄時間", value=datetime.now().time())
             excretion_type = c2.selectbox("分類", ["尿", "便"], index=None)
             
             c1, c2 = st.columns(2)
             staff1_id = c1.selectbox("排泄介助職員1", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None)
-            staff2_id = c2.selectbox("排泄介助職員2", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None)
+            staff2_id = c2.selectbox("排泄介助職員2", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=len(staff_options)-1) # None will be last
             
             notes = st.text_area("特記事項（体調面）")
             
@@ -417,7 +491,7 @@ def show_excretion_page():
                     conn = get_db_connection()
                     conn.execute(
                         'INSERT INTO excretions (log_id, excretion_time, type, staff1_id, staff2_id, notes) VALUES (?, ?, ?, ?, ?, ?)',
-                        (log_id, excretion_time, excretion_type, staff1_id, staff2_id, notes)
+                        (log_id, excretion_time.strftime('%H:%M:%S'), excretion_type, staff1_id, staff2_id, notes)
                     )
                     conn.commit()
                     conn.close()
@@ -456,11 +530,15 @@ def show_absence_page():
     staff = get_staff_list()
     staff_options = {s['id']: s['name'] for s in staff}
 
+    # Pre-select user if coming from log list
+    initial_user_id = st.session_state.get('selected_user_id_for_absence', None)
+    initial_log_date = st.session_state.get('selected_log_date', datetime.today())
+
     selected_user_id = st.selectbox(
         "欠席者を選択",
         options=list(user_options.keys()),
         format_func=lambda x: user_options.get(x),
-        index=None
+        index=list(user_options.keys()).index(initial_user_id) if initial_user_id in user_options else None
     )
 
     if selected_user_id:
@@ -468,13 +546,13 @@ def show_absence_page():
             st.write(f"##### {user_options[selected_user_id]}さんの欠席情報")
             c1, c2 = st.columns(2)
             reception_staff_id = c1.selectbox("受付職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None)
-            reception_date = c2.date_input("受付日", datetime.today())
+            reception_date = c2.date_input("受付日", initial_log_date)
 
             contact_person = st.text_input("欠席の連絡者")
             
             c1, c2 = st.columns(2)
-            absence_start_date = c1.date_input("欠席期間（開始）")
-            absence_end_date = c2.date_input("欠席期間（終了）")
+            absence_start_date = c1.date_input("欠席期間（開始）", initial_log_date)
+            absence_end_date = c2.date_input("欠席期間（終了）", initial_log_date)
             
             reason = st.text_area("欠席理由（詳細を記入）", help="例：本人の体調不良（発熱38.0℃、咳あり）のため。")
             support = st.text_area("援助内容（詳細を記入）", help="例：体調確認、医療機関の受診を勧めた。")
@@ -510,7 +588,21 @@ def main():
     for option in menu_options:
         if st.sidebar.button(option):
             st.session_state.page = option
-    
+            # Clear specific session state variables when navigating from sidebar
+            # to prevent pre-filling forms unexpectedly when not coming from list page
+            if option != "日誌入力":
+                if 'selected_user_id_for_log' in st.session_state:
+                    del st.session_state.selected_user_id_for_log
+            if option != "排泄入力":
+                if 'selected_user_id_for_excretion' in st.session_state:
+                    del st.session_state.selected_user_id_for_excretion
+            if option != "欠席入力":
+                if 'selected_user_id_for_absence' in st.session_state:
+                    del st.session_state.selected_user_id_for_absence
+            if 'selected_log_date' in st.session_state:
+                del st.session_state.selected_log_date
+
+
     # 選択されたページを表示
     page = st.session_state.page
     
