@@ -264,39 +264,48 @@ def show_log_list_page():
         
         # Create columns for display and buttons
         cols = st.columns([0.5, 0.2, 0.1, 0.1, 0.1])
-        cols[0].write("**氏名**")
-        cols[1].write("**日誌**")
-        cols[2].write("**排泄**")
-        cols[3].write("**欠席**")
+        with cols[0]:
+            st.write("**氏名**")
+        with cols[1]:
+            st.write("**日誌**")
+        with cols[2]:
+            st.write("**排泄**")
+        with cols[3]:
+            st.write("**欠席**")
         
         for user in today_users:
             user_id = user["id"]
             user_name = user["name"]
             
+            # Use separate columns for each row's elements
             col_name, col_log, col_excretion, col_absence = st.columns([0.5, 0.2, 0.1, 0.1])
             
-            col_name.write(user_name)
+            with col_name:
+                st.write(user_name)
             
             # Daily Log button
-            if col_log.button("✏️", key=f"log_{user_id}"):
-                st.session_state.page = "日誌入力"
-                st.session_state.selected_user_id_for_log = user_id
-                st.session_state.selected_log_date = log_date
-                st.experimental_rerun()
+            with col_log:
+                if st.button("✏️", key=f"log_{user_id}"):
+                    st.session_state.page = "日誌入力"
+                    st.session_state.selected_user_id_for_log = user_id
+                    st.session_state.selected_log_date = log_date
+                    st.rerun() # Use st.rerun() instead of st.experimental_rerun()
             
             # Excretion button
-            if col_excretion.button("🚽", key=f"excretion_{user_id}"):
-                st.session_state.page = "排泄入力"
-                st.session_state.selected_user_id_for_excretion = user_id
-                st.session_state.selected_log_date = log_date
-                st.experimental_rerun()
-                
+            with col_excretion:
+                if st.button("🚽", key=f"excretion_{user_id}"):
+                    st.session_state.page = "排泄入力"
+                    st.session_state.selected_user_id_for_excretion = user_id
+                    st.session_state.selected_log_date = log_date
+                    st.rerun() # Use st.rerun()
+                    
             # Absence button
-            if col_absence.button("❌", key=f"absence_{user_id}"):
-                st.session_state.page = "欠席入力"
-                st.session_state.selected_user_id_for_absence = user_id
-                st.session_state.selected_log_date = log_date # Absence page primarily uses selected_user_id, but passing log_date for consistency if needed later
-                st.experimental_rerun()
+            with col_absence:
+                if st.button("❌", key=f"absence_{user_id}"):
+                    st.session_state.page = "欠席入力"
+                    st.session_state.selected_user_id_for_absence = user_id
+                    st.session_state.selected_log_date = log_date
+                    st.rerun() # Use st.rerun()
 
     st.write("---")
     with st.expander("臨時利用者の追加"):
@@ -312,16 +321,14 @@ def show_log_list_page():
         )
         if st.button("臨時利用を追加", key="add_temp_user_btn"):
             if selected_user_id_temp:
-                # For temporary users, we might want to automatically create a log entry if they don't have one
-                # and then perhaps redirect to the daily log page for them.
-                # Here, just a success message for simplicity.
+                # Ensure a log entry is created for the temporary user
                 get_or_create_log_id(selected_user_id_temp, log_date)
                 st.success(f"{user_options[selected_user_id_temp]}さんを臨時利用者として追加しました。（日誌エントリを作成済み）")
-                # Option to redirect:
+                # Optionally, redirect to the daily log page for this user
                 # st.session_state.page = "日誌入力"
                 # st.session_state.selected_user_id_for_log = selected_user_id_temp
                 # st.session_state.selected_log_date = log_date
-                # st.experimental_rerun()
+                # st.rerun()
 
 
 def show_log_input_page():
@@ -339,11 +346,20 @@ def show_log_input_page():
     initial_log_date = st.session_state.get('selected_log_date', datetime.today())
 
     c1, c2 = st.columns(2)
+
+    # Safely determine the index for the user selectbox
+    selected_user_index = None
+    if initial_user_id is not None and initial_user_id in user_options:
+        try:
+            selected_user_index = list(user_options.keys()).index(initial_user_id)
+        except ValueError:
+            selected_user_index = None # Fallback if not found for some reason
+
     selected_user_id = c1.selectbox(
         "利用者を選択",
         options=list(user_options.keys()),
         format_func=lambda x: user_options.get(x, "選択してください"),
-        index=list(user_options.keys()).index(initial_user_id) if initial_user_id in user_options else None
+        index=selected_user_index
     )
     log_date = c2.date_input("利用日", initial_log_date)
 
@@ -358,73 +374,129 @@ def show_log_input_page():
         conn.close()
 
         with st.form("log_input_form"):
-            # Populate form with existing data
-            is_absent = st.checkbox("欠席", value=log_data['is_absent'] if log_data else False)
-            
+            # Populate form with existing data, handling None values
+            is_absent = log_data['is_absent'] if log_data and log_data['is_absent'] is not None else False
+            st.checkbox("欠席", value=is_absent) # Note: For forms, checkbox state might not immediately reflect upon navigation if not using key
+
             st.write("---")
             st.write("##### バイタル")
             c1, c2, c3, c4, c5 = st.columns(5)
-            temperature = c1.number_input("体温", min_value=30.0, max_value=45.0, step=0.1, format="%.1f", value=log_data['temperature'] if log_data and log_data['temperature'] else 36.5)
-            pulse = c2.number_input("脈", min_value=0, max_value=200, step=1, value=log_data['pulse'] if log_data and log_data['pulse'] else 70)
-            spo2 = c3.number_input("SPO2", min_value=0, max_value=100, step=1, value=log_data['spo2'] if log_data and log_data['spo2'] else 98)
-            bp_high = c4.number_input("最高血圧", min_value=0, max_value=300, step=1, value=log_data['bp_high'] if log_data and log_data['bp_high'] else 120)
-            bp_low = c5.number_input("最低血圧", min_value=0, max_value=200, step=1, value=log_data['bp_low'] if log_data and log_data['bp_low'] else 80)
-            weight = c1.number_input("体重", min_value=0.0, max_value=200.0, step=0.1, format="%.1f", value=log_data['weight'] if log_data and log_data['weight'] else 50.0)
+            temperature = c1.number_input("体温", min_value=30.0, max_value=45.0, step=0.1, format="%.1f", 
+                                value=log_data['temperature'] if log_data and log_data['temperature'] is not None else 36.5)
+            pulse = c2.number_input("脈", min_value=0, max_value=200, step=1, 
+                                value=log_data['pulse'] if log_data and log_data['pulse'] is not None else 70)
+            spo2 = c3.number_input("SPO2", min_value=0, max_value=100, step=1, 
+                                value=log_data['spo2'] if log_data and log_data['spo2'] is not None else 98)
+            bp_high = c4.number_input("最高血圧", min_value=0, max_value=300, step=1, 
+                                value=log_data['bp_high'] if log_data and log_data['bp_high'] is not None else 120)
+            bp_low = c5.number_input("最低血圧", min_value=0, max_value=200, step=1, 
+                                value=log_data['bp_low'] if log_data and log_data['bp_low'] is not None else 80)
+            weight = c1.number_input("体重", min_value=0.0, max_value=200.0, step=0.1, format="%.1f", 
+                                value=log_data['weight'] if log_data and log_data['weight'] is not None else 50.0)
 
             st.write("---")
             st.write("##### 内服・口腔ケア")
             c1, c2 = st.columns(2)
-            medication_check = c1.checkbox("内服実施", value=log_data['medication_check'] if log_data else False)
+            medication_check = log_data['medication_check'] if log_data and log_data['medication_check'] is not None else False
+            c1.checkbox("内服実施", value=medication_check)
+            
+            medication_staff_index = None
+            if log_data and log_data['medication_staff_id'] is not None and log_data['medication_staff_id'] in staff_options:
+                try:
+                    medication_staff_index = list(staff_options.keys()).index(log_data['medication_staff_id'])
+                except ValueError:
+                    pass
             medication_staff_id = c2.selectbox(
                 "内服実施職員", 
                 options=list(staff_options.keys()), 
                 format_func=lambda x: staff_options.get(x), 
-                index=list(staff_options.keys()).index(log_data['medication_staff_id']) if log_data and log_data['medication_staff_id'] in staff_options else None
+                index=medication_staff_index
             )
             
             c1, c2 = st.columns(2)
-            oral_care_check = c1.checkbox("口腔ケア実施", value=log_data['oral_care_check'] if log_data else False)
+            oral_care_check = log_data['oral_care_check'] if log_data and log_data['oral_care_check'] is not None else False
+            c1.checkbox("口腔ケア実施", value=oral_care_check)
+            
+            oral_care_staff_index = None
+            if log_data and log_data['oral_care_staff_id'] is not None and log_data['oral_care_staff_id'] in staff_options:
+                try:
+                    oral_care_staff_index = list(staff_options.keys()).index(log_data['oral_care_staff_id'])
+                except ValueError:
+                    pass
             oral_care_staff_id = c2.selectbox(
                 "口腔ケア実施職員", 
                 options=list(staff_options.keys()), 
                 format_func=lambda x: staff_options.get(x), 
-                index=list(staff_options.keys()).index(log_data['oral_care_staff_id']) if log_data and log_data['oral_care_staff_id'] in staff_options else None
+                index=oral_care_staff_index
             )
 
             st.write("---")
             st.write("##### 入浴")
-            bath_check = st.checkbox("入浴実施", value=log_data['bath_check'] if log_data else False)
+            bath_check = log_data['bath_check'] if log_data and log_data['bath_check'] is not None else False
+            st.checkbox("入浴実施", value=bath_check)
             c1, c2, c3, c4 = st.columns(4)
             
             # Convert stored time string to datetime.time object for time_input
-            bath_start_time_val = datetime.strptime(log_data['bath_start_time'], '%H:%M:%S').time() if log_data and log_data['bath_start_time'] else time(9, 0)
-            bath_end_time_val = datetime.strptime(log_data['bath_end_time'], '%H:%M:%S').time() if log_data and log_data['bath_end_time'] else time(10, 0)
+            bath_start_time_val = None
+            if log_data and log_data['bath_start_time']:
+                try:
+                    bath_start_time_val = datetime.strptime(log_data['bath_start_time'], '%H:%M:%S').time()
+                except ValueError:
+                    bath_start_time_val = time(9, 0) # Default if parsing fails
+            else:
+                bath_start_time_val = time(9, 0) # Default if None from DB
+
+            bath_end_time_val = None
+            if log_data and log_data['bath_end_time']:
+                try:
+                    bath_end_time_val = datetime.strptime(log_data['bath_end_time'], '%H:%M:%S').time()
+                except ValueError:
+                    bath_end_time_val = time(10, 0) # Default if parsing fails
+            else:
+                bath_end_time_val = time(10, 0) # Default if None from DB
+
 
             bath_start_time = c1.time_input("入浴開始時間", value=bath_start_time_val)
+            
+            bath_start_staff_index = None
+            if log_data and log_data['bath_start_staff_id'] is not None and log_data['bath_start_staff_id'] in staff_options:
+                try:
+                    bath_start_staff_index = list(staff_options.keys()).index(log_data['bath_start_staff_id'])
+                except ValueError:
+                    pass
             bath_start_staff_id = c2.selectbox(
                 "開始記録職員", 
                 options=list(staff_options.keys()), 
                 format_func=lambda x: staff_options.get(x), 
-                index=list(staff_options.keys()).index(log_data['bath_start_staff_id']) if log_data and log_data['bath_start_staff_id'] in staff_options else None, 
+                index=bath_start_staff_index, 
                 key="bath_start_staff"
             )
+            
             bath_end_time = c3.time_input("入浴終了時間", value=bath_end_time_val)
+            
+            bath_end_staff_index = None
+            if log_data and log_data['bath_end_staff_id'] is not None and log_data['bath_end_staff_id'] in staff_options:
+                try:
+                    bath_end_staff_index = list(staff_options.keys()).index(log_data['bath_end_staff_id'])
+                except ValueError:
+                    pass
             bath_end_staff_id = c4.selectbox(
                 "終了記録職員", 
                 options=list(staff_options.keys()), 
                 format_func=lambda x: staff_options.get(x), 
-                index=list(staff_options.keys()).index(log_data['bath_end_staff_id']) if log_data and log_data['bath_end_staff_id'] in staff_options else None, 
+                index=bath_end_staff_index, 
                 key="bath_end_staff"
             )
 
             st.write("---")
-            health_notes = st.text_area("特記（体調面）", value=log_data['health_notes'] if log_data else "")
-            memo1 = st.text_area("その他１", value=log_data['memo1'] if log_data else "")
-            memo2 = st.text_area("その他２", value=log_data['memo2'] if log_data else "")
+            health_notes = st.text_area("特記（体調面）", value=log_data['health_notes'] if log_data and log_data['health_notes'] is not None else "")
+            memo1 = st.text_area("その他１", value=log_data['memo1'] if log_data and log_data['memo1'] is not None else "")
+            memo2 = st.text_area("その他２", value=log_data['memo2'] if log_data and log_data['memo2'] is not None else "")
 
             submitted = st.form_submit_button("日誌を保存")
             if submitted:
                 conn = get_db_connection()
+                # Use current values from Streamlit widgets, not log_data, as they reflect user input
                 conn.execute('''
                     UPDATE daily_logs 
                     SET is_absent=?, temperature=?, pulse=?, spo2=?, bp_high=?, bp_low=?, 
@@ -453,18 +525,29 @@ def show_excretion_page():
     
     staff = get_staff_list()
     staff_options = {s['id']: s['name'] for s in staff}
-    staff_options[None] = "なし" # 職員2用にNoneを追加
+    # Ensure None is a key if it's a possible selection, and handle its index
+    if None not in staff_options:
+        staff_options[None] = "なし" 
 
     # Pre-select user and date if coming from log list
     initial_user_id = st.session_state.get('selected_user_id_for_excretion', None)
     initial_log_date = st.session_state.get('selected_log_date', datetime.today())
 
     c1, c2 = st.columns(2)
+
+    # Safely determine the index for the user selectbox
+    selected_user_index = None
+    if initial_user_id is not None and initial_user_id in user_options:
+        try:
+            selected_user_index = list(user_options.keys()).index(initial_user_id)
+        except ValueError:
+            pass # index remains None
+
     selected_user_id = c1.selectbox(
         "利用者を選択",
         options=list(user_options.keys()),
         format_func=lambda x: user_options.get(x),
-        index=list(user_options.keys()).index(initial_user_id) if initial_user_id in user_options else None
+        index=selected_user_index
     )
     log_date = c2.date_input("利用日", initial_log_date)
     
@@ -476,11 +559,24 @@ def show_excretion_page():
             
             c1, c2 = st.columns(2)
             excretion_time = c1.time_input("排泄時間", value=datetime.now().time())
-            excretion_type = c2.selectbox("分類", ["尿", "便"], index=None)
+            excretion_type = c2.selectbox("分類", ["尿", "便"], index=None) # Start with no default selection
             
             c1, c2 = st.columns(2)
-            staff1_id = c1.selectbox("排泄介助職員1", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None)
-            staff2_id = c2.selectbox("排泄介助職員2", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=len(staff_options)-1) # None will be last
+            # Safely determine index for staff selectboxes
+            staff1_index = None
+            # No initial value from DB for new excretion record, so index remains None
+
+            staff1_id = c1.selectbox("排泄介助職員1", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=staff1_index)
+            
+            staff2_index = None
+            # If the option for 'None' exists and we want it as default, find its index.
+            if None in staff_options:
+                 try:
+                     staff2_index = list(staff_options.keys()).index(None)
+                 except ValueError:
+                     pass # Should not happen if None is in staff_options
+            
+            staff2_id = c2.selectbox("排泄介助職員2", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=staff2_index)
             
             notes = st.text_area("特記事項（体調面）")
             
@@ -496,6 +592,7 @@ def show_excretion_page():
                     conn.commit()
                     conn.close()
                     st.success("排泄記録を追加しました。")
+                    st.rerun() # Rerun to refresh the list of records
                 else:
                     st.error("分類と介助職員1は必須です。")
 
@@ -534,18 +631,31 @@ def show_absence_page():
     initial_user_id = st.session_state.get('selected_user_id_for_absence', None)
     initial_log_date = st.session_state.get('selected_log_date', datetime.today())
 
+    # Safely determine the index for the user selectbox
+    selected_user_index = None
+    if initial_user_id is not None and initial_user_id in user_options:
+        try:
+            selected_user_index = list(user_options.keys()).index(initial_user_id)
+        except ValueError:
+            pass # index remains None
+
     selected_user_id = st.selectbox(
         "欠席者を選択",
         options=list(user_options.keys()),
         format_func=lambda x: user_options.get(x),
-        index=list(user_options.keys()).index(initial_user_id) if initial_user_id in user_options else None
+        index=selected_user_index
     )
 
     if selected_user_id:
         with st.form("absence_form"):
             st.write(f"##### {user_options[selected_user_id]}さんの欠席情報")
             c1, c2 = st.columns(2)
-            reception_staff_id = c1.selectbox("受付職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None)
+            
+            # Safely determine index for reception staff selectbox
+            reception_staff_index = None
+            # No initial value from DB for new absence, so index remains None
+
+            reception_staff_id = c1.selectbox("受付職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=reception_staff_index)
             reception_date = c2.date_input("受付日", initial_log_date)
 
             contact_person = st.text_input("欠席の連絡者")
@@ -599,8 +709,10 @@ def main():
             if option != "欠席入力":
                 if 'selected_user_id_for_absence' in st.session_state:
                     del st.session_state.selected_user_id_for_absence
+            # Always clear selected_log_date unless staying on a related page (though input pages will set it)
             if 'selected_log_date' in st.session_state:
                 del st.session_state.selected_log_date
+            st.rerun() # Use st.rerun() for sidebar navigation as well
 
 
     # 選択されたページを表示
