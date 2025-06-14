@@ -235,7 +235,14 @@ def show_user_info_page():
         user_code = c1.number_input("利用者コード", step=1, format="%d", value=initial_user_code, disabled=(selected_user_id_for_edit is not None), key="user_code_input")
         name = c2.text_input("氏名 *", value=initial_name)
         kana = c1.text_input("フリガナ", value=initial_kana)
-        birthday = c2.date_input("生年月日", value=initial_birthday)
+        
+        # 生年月日の入力可能範囲を制限なしにする (1900年1月1日から現在まで)
+        birthday = c2.date_input(
+            "生年月日", 
+            value=initial_birthday, 
+            min_value=datetime(1900, 1, 1).date(), # 1900年1月1日を最小値に設定
+            max_value=datetime.now(JST).date() # 現在の日付を最大値に設定
+        )
         
         gender = c1.selectbox("性別", ["男", "女", "その他"], index=["男", "女", "その他"].index(initial_gender) if initial_gender else None)
         patient_category = c2.selectbox("患者区分", ["たんぽぽ", "ゆり", "さくら", "すみれ", "なのはな", "療護", "外来"], index=["たんぽぽ", "ゆり", "さくら", "すみれ", "なのはな", "療護", "外来"].index(initial_patient_category) if initial_patient_category else None)
@@ -260,6 +267,7 @@ def show_user_info_page():
         for i, day in enumerate(days_of_week):
             with medication_days_cols[i]:
                 disabled_med_day = not use_days_checkbox_states.get(day, False)
+                # If a checkbox is disabled, its value will be False by default if not explicitly set
                 if st.checkbox(day, value=(day in initial_medication_days_list), key=f"medication_{day}_user_info", disabled=disabled_med_day):
                     medication_days_selected.append(day)
         
@@ -270,6 +278,7 @@ def show_user_info_page():
         for i, day in enumerate(days_of_week):
             with bath_days_cols[i]:
                 disabled_bath_day = not use_days_checkbox_states.get(day, False)
+                # If a checkbox is disabled, its value will be False by default if not explicitly set
                 if st.checkbox(day, value=(day in initial_bath_days_list), key=f"bath_{day}_user_info", disabled=disabled_bath_day):
                     bath_days_selected.append(day)
         
