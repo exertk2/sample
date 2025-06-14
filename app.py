@@ -212,14 +212,38 @@ def show_user_info_page():
         start_date = c1.date_input("利用開始日", value=None)
         end_date = c2.date_input("退所年月日", value=None)
         
-        st.write("利用曜日")
-        use_days_cols = st.columns(7)
-        use_days_selected = [col.checkbox(day, key=f"use_{day}") for col, day in zip(use_days_cols, days_of_week)]
-
-        # 内服・入浴の曜日は仕様書にあるが、ここでは省略してチェックボックスのみ
         st.write("---")
-        medication_needed = st.checkbox("内服あり")
-        bath_needed = st.checkbox("入浴あり")
+        st.write("##### 利用曜日")
+        use_days_cols = st.columns(7)
+        # Store selected state for use in medication/bath day checks
+        use_days_checkbox_states = {}
+        for i, day in enumerate(days_of_week):
+            with use_days_cols[i]:
+                use_days_checkbox_states[day] = st.checkbox(day, key=f"use_{day}_user_info")
+
+        st.write("---")
+        st.write("##### 内服曜日")
+        medication_days_cols = st.columns(7)
+        medication_days_selected = []
+        for i, day in enumerate(days_of_week):
+            with medication_days_cols[i]:
+                # Disable if the corresponding use_day is not selected
+                disabled_med_day = not use_days_checkbox_states.get(day, False)
+                # If a checkbox is disabled, its value will be False by default if not explicitly set
+                if st.checkbox(day, key=f"medication_{day}_user_info", disabled=disabled_med_day):
+                    medication_days_selected.append(day)
+        
+        st.write("---")
+        st.write("##### 入浴曜日")
+        bath_days_cols = st.columns(7)
+        bath_days_selected = []
+        for i, day in enumerate(days_of_week):
+            with bath_days_cols[i]:
+                # Disable if the corresponding use_day is not selected
+                disabled_bath_day = not use_days_checkbox_states.get(day, False)
+                # If a checkbox is disabled, its value will be False by default if not explicitly set
+                if st.checkbox(day, key=f"bath_{day}_user_info", disabled=disabled_bath_day):
+                    bath_days_selected.append(day)
         
         submitted = st.form_submit_button("登録する")
 
@@ -227,15 +251,16 @@ def show_user_info_page():
             if not name:
                 st.error("氏名は必須です。")
             else:
-                use_days_str = ",".join([day for day, selected in zip(days_of_week, use_days_selected) if selected])
-                # 簡単化のため、内服・入浴曜日は保存しない
+                use_days_str = ",".join([day for day, selected in use_days_checkbox_states.items() if selected])
+                medication_days_str = ",".join(medication_days_selected)
+                bath_days_str = ",".join(bath_days_selected)
                 
                 try:
                     conn = get_db_connection()
                     conn.execute('''
-                        INSERT INTO users (user_code, name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (user_code, name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days_str))
+                        INSERT INTO users (user_code, name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days, medication_days, bath_days)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (user_code, name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days_str, medication_days_str, bath_days_str))
                     conn.commit()
                     conn.close()
                     st.success(f"{name}さんの情報を登録しました。")
@@ -295,7 +320,7 @@ def show_log_list_page():
                     st.session_state.page = "日誌入力"
                     st.session_state.selected_user_id_for_log = user_id
                     st.session_state.selected_log_date = log_date
-                    st.rerun() # Use st.rerun() instead of st.experimental_rerun()
+                    st.rerun() 
             
             # Excretion button
             with col_excretion:
@@ -303,7 +328,7 @@ def show_log_list_page():
                     st.session_state.page = "排泄入力"
                     st.session_state.selected_user_id_for_excretion = user_id
                     st.session_state.selected_log_date = log_date
-                    st.rerun() # Use st.rerun()
+                    st.rerun() 
                     
             # Absence button
             with col_absence:
@@ -311,7 +336,7 @@ def show_log_list_page():
                     st.session_state.page = "欠席入力"
                     st.session_state.selected_user_id_for_absence = user_id
                     st.session_state.selected_log_date = log_date
-                    st.rerun() # Use st.rerun()
+                    st.rerun()
 
     st.write("---")
     with st.expander("臨時利用者の追加"):
@@ -330,11 +355,6 @@ def show_log_list_page():
                 # Ensure a log entry is created for the temporary user
                 get_or_create_log_id(selected_user_id_temp, log_date)
                 st.success(f"{user_options[selected_user_id_temp]}さんを臨時利用者として追加しました。（日誌エントリを作成済み）")
-                # Optionally, redirect to the daily log page for this user
-                # st.session_state.page = "日誌入力"
-                # st.session_state.selected_user_id_for_log = selected_user_id_temp
-                # st.session_state.selected_log_date = log_date
-                # st.rerun()
 
 
 def show_log_input_page():
@@ -380,12 +400,22 @@ def show_log_input_page():
         # 既存データを読み込む
         conn = get_db_connection()
         log_data = conn.execute('SELECT * FROM daily_logs WHERE id = ?', (log_id,)).fetchone()
+        
+        # 利用者情報を取得して利用曜日を確認
+        user_info = get_user_by_id(selected_user_id)
+        user_use_days_list = user_info['use_days'].split(',') if user_info and user_info['use_days'] else []
+        weekday_map_full = {0: "月", 1: "火", 2: "水", 3: "木", 4: "金", 5: "土", 6: "日"}
+        selected_weekday = weekday_map_full[log_date.weekday()]
+        
+        # 臨時利用者（利用曜日ではない日に利用）の判定
+        is_temporary_user_for_log_date = selected_weekday not in user_use_days_list
+
         conn.close()
 
         with st.form("log_input_form"):
             # Populate form with existing data, handling None values
             is_absent = log_data['is_absent'] if log_data and log_data['is_absent'] is not None else False
-            st.checkbox("欠席", value=is_absent) # Note: For forms, checkbox state might not immediately reflect upon navigation if not using key
+            st.checkbox("欠席", value=is_absent) 
 
             st.write("---")
             st.write("##### バイタル")
@@ -406,8 +436,7 @@ def show_log_input_page():
             st.write("---")
             st.write("##### 内服・口腔ケア")
             c1, c2 = st.columns(2)
-            medication_check = log_data['medication_check'] if log_data and log_data['medication_check'] is not None else False
-            c1.checkbox("内服実施", value=medication_check)
+            medication_check = c1.checkbox("内服実施", value=log_data['medication_check'] if log_data and log_data['medication_check'] is not None else False)
             
             medication_staff_index = None
             if log_data and log_data['medication_staff_id'] is not None and log_data['medication_staff_id'] in staff_options:
@@ -415,16 +444,20 @@ def show_log_input_page():
                     medication_staff_index = list(staff_options.keys()).index(log_data['medication_staff_id'])
                 except ValueError:
                     pass
+            
+            # 内服実施が未チェックの場合、または臨時利用者ではない場合のみ disabled
+            # つまり、臨時利用者の場合は内服実施が未チェックでも入力可能
+            disable_med_staff_input = (not medication_check) and (not is_temporary_user_for_log_date)
             medication_staff_id = c2.selectbox(
                 "内服実施職員", 
                 options=list(staff_options.keys()), 
                 format_func=lambda x: staff_options.get(x), 
-                index=medication_staff_index
+                index=medication_staff_index,
+                disabled=disable_med_staff_input
             )
             
             c1, c2 = st.columns(2)
-            oral_care_check = log_data['oral_care_check'] if log_data and log_data['oral_care_check'] is not None else False
-            c1.checkbox("口腔ケア実施", value=oral_care_check)
+            oral_care_check = c1.checkbox("口腔ケア実施", value=log_data['oral_care_check'] if log_data and log_data['oral_care_check'] is not None else False)
             
             oral_care_staff_index = None
             if log_data and log_data['oral_care_staff_id'] is not None and log_data['oral_care_staff_id'] in staff_options:
@@ -432,17 +465,20 @@ def show_log_input_page():
                     oral_care_staff_index = list(staff_options.keys()).index(log_data['oral_care_staff_id'])
                 except ValueError:
                     pass
+
+            # 口腔ケア実施が未チェックの場合、または臨時利用者ではない場合のみ disabled
+            disable_oral_staff_input = (not oral_care_check) and (not is_temporary_user_for_log_date)
             oral_care_staff_id = c2.selectbox(
                 "口腔ケア実施職員", 
                 options=list(staff_options.keys()), 
                 format_func=lambda x: staff_options.get(x), 
-                index=oral_care_staff_index
+                index=oral_care_staff_index,
+                disabled=disable_oral_staff_input
             )
 
             st.write("---")
             st.write("##### 入浴")
-            bath_check = log_data['bath_check'] if log_data and log_data['bath_check'] is not None else False
-            st.checkbox("入浴実施", value=bath_check)
+            bath_check = st.checkbox("入浴実施", value=log_data['bath_check'] if log_data and log_data['bath_check'] is not None else False)
             c1, c2, c3, c4 = st.columns(4)
             
             # Convert stored time string to datetime.time object for time_input
@@ -464,8 +500,10 @@ def show_log_input_page():
             else:
                 bath_end_time_val = time(10, 0) # Default if None from DB
 
+            # 入浴実施が未チェックの場合、または臨時利用者ではない場合のみ disabled
+            disable_bath_input = (not bath_check) and (not is_temporary_user_for_log_date)
 
-            bath_start_time = c1.time_input("入浴開始時間", value=bath_start_time_val)
+            bath_start_time = c1.time_input("入浴開始時間", value=bath_start_time_val, disabled=disable_bath_input)
             
             bath_start_staff_index = None
             if log_data and log_data['bath_start_staff_id'] is not None and log_data['bath_start_staff_id'] in staff_options:
@@ -478,10 +516,11 @@ def show_log_input_page():
                 options=list(staff_options.keys()), 
                 format_func=lambda x: staff_options.get(x), 
                 index=bath_start_staff_index, 
-                key="bath_start_staff"
+                key="bath_start_staff",
+                disabled=disable_bath_input
             )
             
-            bath_end_time = c3.time_input("入浴終了時間", value=bath_end_time_val)
+            bath_end_time = c3.time_input("入浴終了時間", value=bath_end_time_val, disabled=disable_bath_input)
             
             bath_end_staff_index = None
             if log_data and log_data['bath_end_staff_id'] is not None and log_data['bath_end_staff_id'] in staff_options:
@@ -494,7 +533,8 @@ def show_log_input_page():
                 options=list(staff_options.keys()), 
                 format_func=lambda x: staff_options.get(x), 
                 index=bath_end_staff_index, 
-                key="bath_end_staff"
+                key="bath_end_staff",
+                disabled=disable_bath_input
             )
 
             st.write("---")
@@ -728,7 +768,7 @@ def main():
             # Always clear selected_log_date unless staying on a related page (though input pages will set it)
             if 'selected_log_date' in st.session_state:
                 del st.session_state.selected_log_date
-            st.rerun() # Use st.rerun() for sidebar navigation as well
+            st.rerun() 
 
 
     # 選択されたページを表示
