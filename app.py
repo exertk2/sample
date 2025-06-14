@@ -195,31 +195,63 @@ def show_user_info_page():
 
     days_of_week = ["月", "火", "水", "木", "金", "土", "日"]
     
+    # 既存利用者選択ロジック
+    users = get_user_list()
+    user_options = {"新規利用者登録": None}
+    user_options.update({user['name']: user['id'] for user in users})
+    
+    selected_user_name = st.selectbox(
+        "利用者を選択（新規登録または既存の利用者情報を編集）",
+        options=list(user_options.keys()),
+        index=0 # Default to "新規利用者登録"
+    )
+    
+    selected_user_id_for_edit = user_options[selected_user_name]
+    current_user_data = None
+    if selected_user_id_for_edit:
+        current_user_data = get_user_by_id(selected_user_id_for_edit)
+
+    # フォームの初期値設定
+    initial_user_code = current_user_data['user_code'] if current_user_data else 0
+    initial_name = current_user_data['name'] if current_user_data else ""
+    initial_kana = current_user_data['kana'] if current_user_data else ""
+    initial_birthday = datetime.strptime(current_user_data['birthday'], '%Y-%m-%d').date() if current_user_data and current_user_data['birthday'] else None
+    initial_gender = current_user_data['gender'] if current_user_data else None
+    initial_patient_category = current_user_data['patient_category'] if current_user_data else None
+    initial_is_active = current_user_data['is_active'] if current_user_data else True
+    initial_start_date = datetime.strptime(current_user_data['start_date'], '%Y-%m-%d').date() if current_user_data and current_user_data['start_date'] else None
+    initial_end_date = datetime.strptime(current_user_data['end_date'], '%Y-%m-%d').date() if current_user_data and current_user_data['end_date'] else None
+    
+    initial_use_days_list = current_user_data['use_days'].split(',') if current_user_data and current_user_data['use_days'] else []
+    initial_medication_days_list = current_user_data['medication_days'].split(',') if current_user_data and current_user_data['medication_days'] else []
+    initial_bath_days_list = current_user_data['bath_days'].split(',') if current_user_data and current_user_data['bath_days'] else []
+
+
     with st.form("user_info_form"):
         st.write("##### 利用者情報を入力してください")
         
         c1, c2 = st.columns(2)
-        user_code = c1.number_input("利用者コード", step=1, format="%d")
-        name = c2.text_input("氏名 *")
-        kana = c1.text_input("フリガナ")
-        birthday = c2.date_input("生年月日", value=None)
+        # 既存利用者編集時は利用者コードを読み取り専用にするか、非表示にする
+        user_code = c1.number_input("利用者コード", step=1, format="%d", value=initial_user_code, disabled=(selected_user_id_for_edit is not None), key="user_code_input")
+        name = c2.text_input("氏名 *", value=initial_name)
+        kana = c1.text_input("フリガナ", value=initial_kana)
+        birthday = c2.date_input("生年月日", value=initial_birthday)
         
-        gender = c1.selectbox("性別", ["男", "女", "その他"], index=None)
-        patient_category = c2.selectbox("患者区分", ["たんぽぽ", "ゆり", "さくら", "すみれ", "なのはな", "療護", "外来"], index=None)
+        gender = c1.selectbox("性別", ["男", "女", "その他"], index=["男", "女", "その他"].index(initial_gender) if initial_gender else None)
+        patient_category = c2.selectbox("患者区分", ["たんぽぽ", "ゆり", "さくら", "すみれ", "なのはな", "療護", "外来"], index=["たんぽぽ", "ゆり", "さくら", "すみれ", "なのはな", "療護", "外来"].index(initial_patient_category) if initial_patient_category else None)
 
-        is_active = st.checkbox("在籍中", value=True)
+        is_active = st.checkbox("在籍中", value=initial_is_active)
         c1, c2 = st.columns(2)
-        start_date = c1.date_input("利用開始日", value=None)
-        end_date = c2.date_input("退所年月日", value=None)
+        start_date = c1.date_input("利用開始日", value=initial_start_date)
+        end_date = c2.date_input("退所年月日", value=initial_end_date)
         
         st.write("---")
         st.write("##### 利用曜日")
         use_days_cols = st.columns(7)
-        # Store selected state for use in medication/bath day checks
         use_days_checkbox_states = {}
         for i, day in enumerate(days_of_week):
             with use_days_cols[i]:
-                use_days_checkbox_states[day] = st.checkbox(day, key=f"use_{day}_user_info")
+                use_days_checkbox_states[day] = st.checkbox(day, value=(day in initial_use_days_list), key=f"use_{day}_user_info")
 
         st.write("---")
         st.write("##### 内服曜日")
@@ -227,10 +259,8 @@ def show_user_info_page():
         medication_days_selected = []
         for i, day in enumerate(days_of_week):
             with medication_days_cols[i]:
-                # Disable if the corresponding use_day is not selected
                 disabled_med_day = not use_days_checkbox_states.get(day, False)
-                # If a checkbox is disabled, its value will be False by default if not explicitly set
-                if st.checkbox(day, key=f"medication_{day}_user_info", disabled=disabled_med_day):
+                if st.checkbox(day, value=(day in initial_medication_days_list), key=f"medication_{day}_user_info", disabled=disabled_med_day):
                     medication_days_selected.append(day)
         
         st.write("---")
@@ -239,14 +269,17 @@ def show_user_info_page():
         bath_days_selected = []
         for i, day in enumerate(days_of_week):
             with bath_days_cols[i]:
-                # Disable if the corresponding use_day is not selected
                 disabled_bath_day = not use_days_checkbox_states.get(day, False)
-                # If a checkbox is disabled, its value will be False by default if not explicitly set
-                if st.checkbox(day, key=f"bath_{day}_user_info", disabled=disabled_bath_day):
+                if st.checkbox(day, value=(day in initial_bath_days_list), key=f"bath_{day}_user_info", disabled=disabled_bath_day):
                     bath_days_selected.append(day)
         
-        submitted = st.form_submit_button("登録する")
+        c_submit1, c_submit2 = st.columns(2)
 
+        if selected_user_id_for_edit is None: # 新規登録モード
+            submitted = c_submit1.form_submit_button("新規登録する")
+        else: # 更新モード
+            submitted = c_submit1.form_submit_button("更新する")
+            
         if submitted:
             if not name:
                 st.error("氏名は必須です。")
@@ -255,19 +288,29 @@ def show_user_info_page():
                 medication_days_str = ",".join(medication_days_selected)
                 bath_days_str = ",".join(bath_days_selected)
                 
+                conn = get_db_connection()
                 try:
-                    conn = get_db_connection()
-                    conn.execute('''
-                        INSERT INTO users (user_code, name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days, medication_days, bath_days)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (user_code, name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days_str, medication_days_str, bath_days_str))
+                    if selected_user_id_for_edit is None: # 新規登録
+                        conn.execute('''
+                            INSERT INTO users (user_code, name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days, medication_days, bath_days)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (user_code, name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days_str, medication_days_str, bath_days_str))
+                        st.success(f"{name}さんの情報を登録しました。")
+                    else: # 更新
+                        conn.execute('''
+                            UPDATE users 
+                            SET name=?, kana=?, birthday=?, gender=?, patient_category=?, is_active=?, start_date=?, end_date=?, use_days=?, medication_days=?, bath_days=?
+                            WHERE id=?
+                        ''', (name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days_str, medication_days_str, bath_days_str, selected_user_id_for_edit))
+                        st.success(f"{name}さんの情報を更新しました。")
                     conn.commit()
-                    conn.close()
-                    st.success(f"{name}さんの情報を登録しました。")
                 except sqlite3.IntegrityError:
                     st.error("その利用者コードは既に使用されています。")
                 except Exception as e:
-                    st.error(f"登録中にエラーが発生しました: {e}")
+                    st.error(f"処理中にエラーが発生しました: {e}")
+                finally:
+                    conn.close()
+
 
 def show_log_list_page():
     """日誌一覧ページ"""
