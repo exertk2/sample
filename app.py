@@ -868,186 +868,183 @@ def show_absence_page():
     initial_support_content_other = existing_absence_data['support_content_other'] if existing_absence_data and existing_absence_data['support_content_other'] is not None else ""
 
 
-    with st.form("absence_form"):
-        # Display a subheader that changes based on user selection
-        if selected_user_id:
-            st.write(f"##### {next((u['name'] for u in user_options_list_for_select if u['id'] == selected_user_id), '利用者情報')}さんの欠席情報")
-        else:
-            st.info("欠席者を選択してください。") # Inform user to select a user first
+    # Display a subheader that changes based on user selection
+    if selected_user_id:
+        st.write(f"##### {next((u['name'] for u in user_options_list_for_select if u['id'] == selected_user_id), '利用者情報')}さんの欠席情報")
+    else:
+        st.info("欠席者を選択してください。") # Inform user to select a user first
 
-        # 2. 受付職員, 3. 受付日
-        c1, c2 = st.columns(2)
-        reception_staff_index = None
-        if initial_reception_staff_id is not None and initial_reception_staff_id in staff_options:
-            try:
-                reception_staff_index = list(staff_options.keys()).index(initial_reception_staff_id)
-            except ValueError:
-                pass
-        reception_staff_id = c1.selectbox("受付職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=reception_staff_index, key="reception_staff_select", disabled=form_disabled)
-        reception_date = c2.date_input("受付日", value=initial_reception_date, key="reception_date_input", disabled=form_disabled)
+    # 2. 受付職員, 3. 受付日
+    c1, c2 = st.columns(2)
+    reception_staff_index = None
+    if initial_reception_staff_id is not None and initial_reception_staff_id in staff_options:
+        try:
+            reception_staff_index = list(staff_options.keys()).index(initial_reception_staff_id)
+        except ValueError:
+            pass
+    reception_staff_id = c1.selectbox("受付職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=reception_staff_index, key="reception_staff_select", disabled=form_disabled)
+    reception_date = c2.date_input("受付日", value=initial_reception_date, key="reception_date_input", disabled=form_disabled)
 
-        # 4. 欠席の連絡者
-        contact_person = st.text_input("欠席の連絡者", value=initial_contact_person, key="contact_person_input", disabled=form_disabled)
+    # 4. 欠席の連絡者
+    contact_person = st.text_input("欠席の連絡者", value=initial_contact_person, key="contact_person_input", disabled=form_disabled)
 
-        # 5. 欠席期間（開始）, 6. 欠席期間（終了）
-        c1, c2 = st.columns(2)
-        absence_start_date = c1.date_input("欠席期間（開始）", value=initial_absence_start_date, key="absence_start_date_input", disabled=form_disabled)
-        absence_end_date = c2.date_input("欠席期間（終了）", value=initial_absence_end_date, key="absence_end_date_input", disabled=form_disabled)
+    # 5. 欠席期間（開始）, 6. 欠席期間（終了）
+    c1, c2 = st.columns(2)
+    absence_start_date = c1.date_input("欠席期間（開始）", value=initial_absence_start_date, key="absence_start_date_input", disabled=form_disabled)
+    absence_end_date = c2.date_input("欠席期間（終了）", value=initial_absence_end_date, key="absence_end_date_input", disabled=form_disabled)
 
-        st.write("---")
-        st.write("##### 欠席理由")
+    st.write("---")
+    st.write("##### 欠席理由")
 
-        # 7. 本人の体調不良 (チェックボックス)
-        reason_self_illness = st.checkbox("本人の体調不良", value=initial_reason_self_illness, key="reason_self_illness_checkbox", disabled=form_disabled)
+    # 7. 本人の体調不良 (チェックボックス)
+    reason_self_illness = st.checkbox("本人の体調不良", value=initial_reason_self_illness, key="reason_self_illness_checkbox", disabled=form_disabled)
 
-        # 8. 発作, 9. 咳, 10. 発熱, 11. 鼻水, 12. 嘔吐, 13. 下痢, 14. 機嫌不良, 15. 発疹
-        col_b1, col_b2, col_b3, col_b4 = st.columns(4)
-        with col_b1:
-            reason_seizure = st.checkbox("発作", value=initial_reason_seizure, key="reason_seizure_checkbox", disabled=form_disabled)
-            reason_cough = st.checkbox("咳", value=initial_reason_cough, key="reason_cough_checkbox", disabled=form_disabled)
-        with col_b2:
-            reason_fever = st.checkbox("発熱", value=initial_reason_fever, key="reason_fever_checkbox", disabled=form_disabled)
-            reason_runny_nose = st.checkbox("鼻水", value=initial_reason_runny_nose, key="reason_runny_nose_checkbox", disabled=form_disabled)
-        with col_b3:
-            reason_vomiting = st.checkbox("嘔吐", value=initial_reason_vomiting, key="reason_vomiting_checkbox", disabled=form_disabled)
-            reason_diarrhea = st.checkbox("下痢", value=initial_reason_diarrhea, key="reason_diarrhea_checkbox", disabled=form_disabled)
-        with col_b4:
-            reason_mood_bad = st.checkbox("機嫌不良", value=initial_reason_mood_bad, key="reason_mood_bad_checkbox", disabled=form_disabled)
-            reason_rash = st.checkbox("発疹", value=initial_reason_rash, key="reason_rash_checkbox", disabled=form_disabled)
-        # 16. その他（本人の体調不良）
-        reason_self_illness_other_text = st.text_area("その他（本人の体調不良）", value=initial_reason_self_illness_other_text, key="reason_self_illness_other_text_input", disabled=form_disabled)
-
-
-        # 17. 本人の体調不良以外 (チェックボックス)
-        reason_other_than_self_illness = st.checkbox("本人の体調不良以外", value=initial_reason_other_than_self_illness, key="reason_other_than_self_illness_checkbox", disabled=form_disabled)
-
-        # 18. 家族の都合 (チェックボックス)
-        reason_family_convenience = st.checkbox("家族の都合", value=initial_reason_family_convenience, key="reason_family_convenience_checkbox", disabled=form_disabled)
-        # 19. 家族の体調不良 (チェックボックス)
-        reason_family_illness = st.checkbox("家族の体調不良", value=initial_reason_family_illness, key="reason_family_illness_checkbox", disabled=form_disabled)
-        # 20. 誰が？ (1行入力)
-        reason_family_illness_who = st.text_input("誰が？", value=initial_reason_family_illness_who, key="reason_family_illness_who_input", disabled=form_disabled)
-
-        # 21. 定期受診 (チェックボックス)
-        reason_regular_checkup = st.checkbox("定期受診", value=initial_reason_regular_checkup, key="reason_regular_checkup_checkbox", disabled=form_disabled)
-        # 22. 受診先 (1行入力)
-        reason_checkup_place = st.text_input("受診先", value=initial_reason_checkup_place, key="reason_checkup_place_input", disabled=form_disabled)
-
-        # 23. その他（本人の体調不良以外）
-        reason_other_text = st.text_area("その他（本人の体調不良以外）", value=initial_reason_other_text, key="reason_other_text_input", disabled=form_disabled)
-
-        st.write("---")
-        st.write("##### 援助内容")
-
-        # 24. 体調を確認した (チェックボックス)
-        support_checked_health_confirm = st.checkbox("体調を確認した", value=initial_support_checked_health_confirm, key="support_checked_health_confirm_checkbox", disabled=form_disabled)
-        # 25. 内容（体調確認）
-        support_content_health_confirm = st.text_area("内容（体調確認）", value=initial_support_content_health_confirm, key="support_content_health_confirm_input", disabled=form_disabled)
-
-        # 26. 医療機関の受診を勧めた (チェックボックス)
-        support_checked_medical_recommend = st.checkbox("医療機関の受診を勧めた", value=initial_support_checked_medical_recommend, key="support_checked_medical_recommend_checkbox", disabled=form_disabled)
-        # 27. 内容（医療機関の受診）
-        support_content_medical_recommend = st.text_input("内容（医療機関の受診）", value=initial_support_content_medical_recommend, key="support_content_medical_recommend_input", disabled=form_disabled)
-
-        # 28. 次回利用日を確認した (チェックボックス)
-        support_checked_next_visit = st.checkbox("次回利用日を確認した", value=initial_support_checked_next_visit, key="support_checked_next_visit_checkbox", disabled=form_disabled)
-        # 29. 日付（次回利用日）
-        default_next_visit_date = initial_support_date_next_visit if initial_support_date_next_visit else current_jst_date
-        support_date_next_visit = st.date_input("日付（次回利用日）", value=default_next_visit_date, key="support_date_next_visit_input", disabled=form_disabled)
-
-        # 30. その他（援助内容） (チェックボックス)
-        support_checked_other = st.checkbox("その他（援助内容）", value=initial_support_checked_other, key="support_checked_other_checkbox", disabled=form_disabled)
-        # 31. 内容（その他援助）
-        support_content_other = st.text_area("内容（その他援助）", value=initial_support_content_other, key="support_content_other_input", disabled=form_disabled)
-
-        # 32. 援助内容（詳細を記入 - 旧フィールド）
-        support_content = st.text_area("援助内容（詳細を記入 - 旧フィールド）", value=initial_support_content, help="例：体調確認、医療機関の受診を勧めた。", key="support_content_old_input", disabled=form_disabled)
+    # 8. 発作, 9. 咳, 10. 発熱, 11. 鼻水, 12. 嘔吐, 13. 下痢, 14. 機嫌不良, 15. 発疹
+    col_b1, col_b2, col_b3, col_b4 = st.columns(4)
+    with col_b1:
+        reason_seizure = st.checkbox("発作", value=initial_reason_seizure, key="reason_seizure_checkbox", disabled=form_disabled)
+        reason_cough = st.checkbox("咳", value=initial_reason_cough, key="reason_cough_checkbox", disabled=form_disabled)
+    with col_b2:
+        reason_fever = st.checkbox("発熱", value=initial_reason_fever, key="reason_fever_checkbox", disabled=form_disabled)
+        reason_runny_nose = st.checkbox("鼻水", value=initial_reason_runny_nose, key="reason_runny_nose_checkbox", disabled=form_disabled)
+    with col_b3:
+        reason_vomiting = st.checkbox("嘔吐", value=initial_reason_vomiting, key="reason_vomiting_checkbox", disabled=form_disabled)
+        reason_diarrhea = st.checkbox("下痢", value=initial_reason_diarrhea, key="reason_diarrhea_checkbox", disabled=form_disabled)
+    with col_b4:
+        reason_mood_bad = st.checkbox("機嫌不良", value=initial_reason_mood_bad, key="reason_mood_bad_checkbox", disabled=form_disabled)
+        reason_rash = st.checkbox("発疹", value=initial_reason_rash, key="reason_rash_checkbox", disabled=form_disabled)
+    # 16. その他（本人の体調不良）
+    reason_self_illness_other_text = st.text_area("その他（本人の体調不良）", value=initial_reason_self_illness_other_text, key="reason_self_illness_other_text_input", disabled=form_disabled)
 
 
-        # 33. 欠席情報を登録/更新 (ボタン)
-        submitted = st.form_submit_button("欠席情報を登録/更新", key="absence_info_submit_button", disabled=form_disabled)
-        if submitted:
-            conn = get_db_connection()
+    # 17. 本人の体調不良以外 (チェックボックス)
+    reason_other_than_self_illness = st.checkbox("本人の体調不良以外", value=initial_reason_other_than_self_illness, key="reason_other_than_self_illness_checkbox", disabled=form_disabled)
 
-            # Convert datetime.date objects to string for database storage
+    # 18. 家族の都合 (チェックボックス)
+    reason_family_convenience = st.checkbox("家族の都合", value=initial_reason_family_convenience, key="reason_family_convenience_checkbox", disabled=form_disabled)
+    # 19. 家族の体調不良 (チェックボックス)
+    reason_family_illness = st.checkbox("家族の体調不良", value=initial_reason_family_illness, key="reason_family_illness_checkbox", disabled=form_disabled)
+    # 20. 誰が？ (1行入力)
+    reason_family_illness_who = st.text_input("誰が？", value=initial_reason_family_illness_who, key="reason_family_illness_who_input", disabled=form_disabled)
+
+    # 21. 定期受診 (チェックボックス)
+    reason_regular_checkup = st.checkbox("定期受診", value=initial_reason_regular_checkup, key="reason_regular_checkup_checkbox", disabled=form_disabled)
+    # 22. 受診先 (1行入力)
+    reason_checkup_place = st.text_input("受診先", value=initial_reason_checkup_place, key="reason_checkup_place_input", disabled=form_disabled)
+
+    # 23. その他（本人の体調不良以外）
+    reason_other_text = st.text_area("その他（本人の体調不良以外）", value=initial_reason_other_text, key="reason_other_text_input", disabled=form_disabled)
+
+    st.write("---")
+    st.write("##### 援助内容")
+
+    # 24. 体調を確認した (チェックボックス)
+    support_checked_health_confirm = st.checkbox("体調を確認した", value=initial_support_checked_health_confirm, key="support_checked_health_confirm_checkbox", disabled=form_disabled)
+    # 25. 内容（体調確認）
+    support_content_health_confirm = st.text_area("内容（体調確認）", value=initial_support_content_health_confirm, key="support_content_health_confirm_input", disabled=form_disabled)
+
+    # 26. 医療機関の受診を勧めた (チェックボックス)
+    support_checked_medical_recommend = st.checkbox("医療機関の受診を勧めた", value=initial_support_checked_medical_recommend, key="support_checked_medical_recommend_checkbox", disabled=form_disabled)
+    # 27. 内容（医療機関の受診）
+    support_content_medical_recommend = st.text_input("内容（医療機関の受診）", value=initial_support_content_medical_recommend, key="support_content_medical_recommend_input", disabled=form_disabled)
+
+    # 28. 次回利用日を確認した (チェックボックス)
+    support_checked_next_visit = st.checkbox("次回利用日を確認した", value=initial_support_checked_next_visit, key="support_checked_next_visit_checkbox", disabled=form_disabled)
+    # 29. 日付（次回利用日）
+    default_next_visit_date = initial_support_date_next_visit if initial_support_date_next_visit else current_jst_date
+    support_date_next_visit = st.date_input("日付（次回利用日）", value=default_next_visit_date, key="support_date_next_visit_input", disabled=form_disabled)
+
+    # 30. その他（援助内容） (チェックボックス)
+    support_checked_other = st.checkbox("その他（援助内容）", value=initial_support_checked_other, key="support_checked_other_checkbox", disabled=form_disabled)
+    # 31. 内容（その他援助）
+    support_content_other = st.text_area("内容（その他援助）", value=initial_support_content_other, key="support_content_other_input", disabled=form_disabled)
+
+    # 32. 援助内容（詳細を記入 - 旧フィールド）
+    support_content = st.text_area("援助内容（詳細を記入 - 旧フィールド）", value=initial_support_content, help="例：体調確認、医療機関の受診を勧めた。", key="support_content_old_input", disabled=form_disabled)
+
+
+    # 33. 欠席情報を登録/更新 (ボタン)
+    submitted = st.button("欠席情報を登録/更新", key="absence_info_submit_button", disabled=form_disabled)
+    if submitted:
+        conn = get_db_connection()
+
+        # Convert datetime.date objects to string for database storage
+        support_date_next_visit_str = None
+        if support_checked_next_visit and support_date_next_visit:
+            support_date_next_visit_str = support_date_next_visit.strftime('%Y-%m-%d')
+        elif not support_checked_next_visit: # If checkbox is off, ensure no date is saved
             support_date_next_visit_str = None
-            if support_checked_next_visit and support_date_next_visit:
-                support_date_next_visit_str = support_date_next_visit.strftime('%Y-%m-%d')
-            elif not support_checked_next_visit: # If checkbox is off, ensure no date is saved
-                support_date_next_visit_str = None
 
-            # Check if an existing record needs to be updated or a new one inserted
-            if existing_absence_data:
-                conn.execute('''
-                    UPDATE absences
-                    SET reception_date=?, reception_staff_id=?, contact_person=?,
-                        absence_start_date=?, absence_end_date=?,
-                        reason_self_illness=?, reason_seizure=?, reason_fever=?, reason_vomiting=?,
-                        reason_cough=?, reason_runny_nose=?, reason_diarrhea=?, reason_mood_bad=?,
-                        reason_rash=?, reason_self_illness_other_text=?,
-                        reason_other_than_self_illness=?, reason_family_convenience=?,
-                        reason_family_illness=?, reason_family_illness_who=?,
-                        reason_regular_checkup=?, reason_checkup_place=?,
-                        reason_other_text=?, support_content=?, -- Original support content
-                        support_checked_health_confirm=?, support_content_health_confirm=?,
-                        support_checked_medical_recommend=?, support_content_medical_recommend=?,
-                        support_checked_next_visit=?, support_date_next_visit=?,
-                        support_checked_other=?, support_content_other=?
-                    WHERE id = ?
-                ''', (reception_date, reception_staff_id, contact_person,
-                      absence_start_date, absence_end_date,
-                      reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
-                      reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
-                      reason_rash, reason_self_illness_other_text,
-                      reason_other_than_self_illness, reason_family_convenience,
-                      reason_family_illness, reason_family_illness_who, # Use direct widget value
-                      reason_regular_checkup, reason_checkup_place, # Use direct widget value
-                      reason_other_text, support_content, # Original support content
-                      support_checked_health_confirm, support_content_health_confirm, # Use direct widget value
-                      support_checked_medical_recommend, support_content_medical_recommend, # Use direct widget value
-                      support_checked_next_visit, support_date_next_visit_str, # Store date as string
-                      support_checked_other, support_content_other, # Use direct widget value
-                      existing_absence_data['id']))
-                conn.commit()
-                conn.close()
-                st.success("欠席情報を更新しました。")
-            else:
-                # If no user is selected, or no existing data, but submitted:
-                # Insert logic should be here if it's a new entry (i.e., existing_absence_data is None)
-                # But if selected_user_id is None, this block won't be reached as submit button is disabled.
-                # So this 'else' implies selected_user_id IS NOT None but existing_absence_data IS None (new record for selected user).
-                conn.execute('''
-                    INSERT INTO absences (user_id, reception_date, reception_staff_id, contact_person,
-                                        absence_start_date, absence_end_date,
-                                        reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
-                                        reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
-                                        reason_rash, reason_self_illness_other_text,
-                                        reason_other_than_self_illness, reason_family_convenience,
-                                        reason_family_illness, reason_family_illness_who,
-                                        reason_regular_checkup, reason_checkup_place,
-                                        reason_other_text, support_content, -- Original support content
-                                        support_checked_health_confirm, support_content_health_confirm,
-                                        support_checked_medical_recommend, support_content_medical_recommend,
-                                        support_checked_next_visit, support_date_next_visit,
-                                        support_checked_other, support_content_other)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (selected_user_id, reception_date, reception_staff_id, contact_person,
-                      absence_start_date, absence_end_date,
-                      reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
-                      reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
-                      reason_rash, reason_self_illness_other_text,
-                      reason_other_than_self_illness, reason_family_convenience,
-                      reason_family_illness, reason_family_illness_who, # Use direct widget value
-                      reason_regular_checkup, reason_checkup_place, # Use direct widget value
-                      reason_other_text, support_content, # Original support content
-                      support_checked_health_confirm, support_content_health_confirm, # Use direct widget value
-                      support_checked_medical_recommend, support_content_medical_recommend, # Use direct widget value
-                      support_checked_next_visit, support_date_next_visit_str, # Store date as string
-                      support_checked_other, support_content_other)) # Use direct widget value
-                conn.commit()
-                conn.close()
-                st.success("欠席情報を登録しました。")
-            st.rerun() # Refresh to show updated data if any, or clear form for new entry.
+        # Check if an existing record needs to be updated or a new one inserted
+        if existing_absence_data:
+            conn.execute('''
+                UPDATE absences
+                SET reception_date=?, reception_staff_id=?, contact_person=?,
+                    absence_start_date=?, absence_end_date=?,
+                    reason_self_illness=?, reason_seizure=?, reason_fever=?, reason_vomiting=?,
+                    reason_cough=?, reason_runny_nose=?, reason_diarrhea=?, reason_mood_bad=?,
+                    reason_rash=?, reason_self_illness_other_text=?,
+                    reason_other_than_self_illness=?, reason_family_convenience=?,
+                    reason_family_illness=?, reason_family_illness_who=?,
+                    reason_regular_checkup=?, reason_checkup_place=?,
+                    reason_other_text=?, support_content=?, -- Original support content
+                    support_checked_health_confirm=?, support_content_health_confirm=?,
+                    support_checked_medical_recommend=?, support_content_medical_recommend=?,
+                    support_checked_next_visit=?, support_date_next_visit=?,
+                    support_checked_other=?, support_content_other=?
+                WHERE id = ?
+            ''', (reception_date, reception_staff_id, contact_person,
+                  absence_start_date, absence_end_date,
+                  reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
+                  reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
+                  reason_rash, reason_self_illness_other_text,
+                  reason_other_than_self_illness, reason_family_convenience,
+                  reason_family_illness, reason_family_illness_who, # Use direct widget value
+                  reason_regular_checkup, reason_checkup_place, # Use direct widget value
+                  reason_other_text, support_content, # Original support content
+                  support_checked_health_confirm, support_content_health_confirm, # Use direct widget value
+                  support_checked_medical_recommend, support_content_medical_recommend, # Use direct widget value
+                  support_checked_next_visit, support_date_next_visit_str, # Store date as string
+                  support_checked_other, support_content_other, # Use direct widget value
+                  existing_absence_data['id']))
+            st.success("欠席情報を更新しました。")
+        else:
+            # If no user is selected, or no existing data, but submitted:
+            # Insert logic should be here if it's a new entry (i.e., existing_absence_data is None)
+            # But if selected_user_id is None, this block won't be reached as submit button is disabled.
+            # So this 'else' implies selected_user_id IS NOT None but existing_absence_data IS None (new record for selected user).
+            conn.execute('''
+                INSERT INTO absences (user_id, reception_date, reception_staff_id, contact_person,
+                                    absence_start_date, absence_end_date,
+                                    reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
+                                    reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
+                                    reason_rash, reason_self_illness_other_text,
+                                    reason_other_than_self_illness, reason_family_convenience,
+                                    reason_family_illness, reason_family_illness_who,
+                                    reason_regular_checkup, reason_checkup_place,
+                                    reason_other_text, support_content, -- Original support content
+                                    support_checked_health_confirm, support_content_health_confirm,
+                                    support_checked_medical_recommend, support_content_medical_recommend,
+                                    support_checked_next_visit, support_date_next_visit,
+                                    support_checked_other, support_content_other)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (selected_user_id, reception_date, reception_staff_id, contact_person,
+                  absence_start_date, absence_end_date,
+                  reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
+                  reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
+                  reason_rash, reason_self_illness_other_text,
+                  reason_other_than_self_illness, reason_family_convenience,
+                  reason_family_illness, reason_family_illness_who, # Use direct widget value
+                  reason_regular_checkup, reason_checkup_place, # Use direct widget value
+                  reason_other_text, support_content, # Original support content
+                  support_checked_health_confirm, support_content_health_confirm, # Use direct widget value
+                  support_checked_medical_recommend, support_content_medical_recommend, # Use direct widget value
+                  support_checked_next_visit, support_date_next_visit_str, # Store date as string
+                  support_checked_other, support_content_other)) # Use direct widget value
+            st.success("欠席情報を登録しました。")
+        conn.commit()
+        conn.close()
+        st.rerun() # Refresh to show updated data if any, or clear form for new entry.
 
 
 # --- メインのアプリケーション実行部分 ---
