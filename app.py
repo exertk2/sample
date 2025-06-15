@@ -3,7 +3,6 @@ import sqlite3
 import pandas as pd
 from datetime import datetime, time
 import pytz # Import pytz for timezone handling
-import json # Import json for storing complex data structures
 
 # --- データベース設定 ---
 DB_FILE = "day_log.db"
@@ -111,9 +110,8 @@ def create_tables():
             contact_person TEXT,
             absence_start_date DATE,
             absence_end_date DATE,
-            reason_type TEXT, -- "本人体調不良" or "本人体調不良以外"
-            reason_details TEXT, -- JSON文字列で詳細を保存
-            support_content TEXT, -- JSON文字列で詳細を保存
+            reason TEXT, -- 簡略化のためテキストエリアで一括入力
+            support_content TEXT, -- 簡略化のためテキストエリアで一括入力
             FOREIGN KEY (user_id) REFERENCES users (id),
             FOREIGN KEY (reception_staff_id) REFERENCES staff (id)
         )
@@ -419,9 +417,7 @@ def show_log_input_page():
     user_options = {user['id']: user['name'] for user in users}
     
     staff = get_staff_list()
-    # Create staff_options including a "選択してください" for None
-    staff_options_with_none = {None: "選択してください"}
-    staff_options_with_none.update({s['id']: s['name'] for s in staff})
+    staff_options = {s['id']: s['name'] for s in staff}
     
     # Get current date in JST
     current_jst_date = datetime.now(JST).date()
@@ -434,15 +430,16 @@ def show_log_input_page():
 
     # Safely determine the index for the user selectbox
     selected_user_index = None
-    if initial_user_id is not None and initial_user_id in user_options:
+    user_keys = list(user_options.keys())
+    if initial_user_id is not None and initial_user_id in user_keys:
         try:
-            selected_user_index = list(user_options.keys()).index(initial_user_id)
+            selected_user_index = user_keys.index(initial_user_id)
         except ValueError:
             selected_user_index = None # Fallback if not found for some reason
 
     selected_user_id = c1.selectbox(
         "利用者を選択",
-        options=list(user_options.keys()),
+        options=user_keys,
         format_func=lambda x: user_options.get(x, "選択してください"),
         index=selected_user_index
     )
@@ -470,156 +467,151 @@ def show_log_input_page():
 
         with st.form("log_input_form"):
             # Populate form with existing data, handling None values
-            is_absent = log_data['is_absent'] if log_data and log_data['is_absent'] is not None else False
-            st.checkbox("欠席", value=is_absent) 
+            is_absent = st.checkbox("欠席", value=bool(log_data['is_absent'])) 
 
             st.write("---")
             st.write("##### バイタル")
             c1, c2, c3, c4, c5 = st.columns(5)
             temperature = c1.number_input("体温", min_value=30.0, max_value=45.0, step=0.1, format="%.1f", 
-                                value=log_data['temperature'] if log_data and log_data['temperature'] is not None else 36.5, key="temp_input")
+                                value=log_data['temperature'] if log_data and log_data['temperature'] is not None else 36.5)
             pulse = c2.number_input("脈", min_value=0, max_value=200, step=1, 
-                                value=log_data['pulse'] if log_data and log_data['pulse'] is not None else 70, key="pulse_input")
+                                value=log_data['pulse'] if log_data and log_data['pulse'] is not None else 70)
             spo2 = c3.number_input("SPO2", min_value=0, max_value=100, step=1, 
-                                value=log_data['spo2'] if log_data and log_data['spo2'] is not None else 98, key="spo2_input")
+                                value=log_data['spo2'] if log_data and log_data['spo2'] is not None else 98)
             bp_high = c4.number_input("最高血圧", min_value=0, max_value=300, step=1, 
-                                value=log_data['bp_high'] if log_data and log_data['bp_high'] is not None else 120, key="bph_input")
+                                value=log_data['bp_high'] if log_data and log_data['bp_high'] is not None else 120)
             bp_low = c5.number_input("最低血圧", min_value=0, max_value=200, step=1, 
-                                value=log_data['bp_low'] if log_data and log_data['bp_low'] is not None else 80, key="bpl_input")
+                                value=log_data['bp_low'] if log_data and log_data['bp_low'] is not None else 80)
             weight = c1.number_input("体重", min_value=0.0, max_value=200.0, step=0.1, format="%.1f", 
-                                value=log_data['weight'] if log_data and log_data['weight'] is not None else 50.0, key="weight_input")
+                                value=log_data['weight'] if log_data and log_data['weight'] is not None else 50.0)
 
             st.write("---")
             st.write("##### 内服・口腔ケア")
             c1, c2 = st.columns(2)
-            medication_check = c1.checkbox("内服実施", value=log_data['medication_check'] if log_data and log_data['medication_check'] is not None else False, key="med_check_input")
+            medication_check = c1.checkbox("内服実施", value=bool(log_data['medication_check']))
             
-            medication_staff_selected_index = 0 
-            if log_data and log_data['medication_staff_id'] is not None:
+            staff_keys = list(staff_options.keys())
+            medication_staff_index = None
+            if log_data and log_data['medication_staff_id'] is not None and log_data['medication_staff_id'] in staff_keys:
                 try:
-                    medication_staff_selected_index = list(staff_options_with_none.keys()).index(log_data['medication_staff_id'])
+                    medication_staff_index = staff_keys.index(log_data['medication_staff_id'])
                 except ValueError:
-                    pass # Keep default if not found
+                    pass
             
-            # 内服実施が未チェックの場合、または臨時利用者ではない場合のみ disabled
-            # つまり、臨時利用者の場合は内服実施が未チェックでも入力可能
-            disable_med_staff_input = (not medication_check) and (not is_temporary_user_for_log_date)
+            disable_med_staff_input = not medication_check
             medication_staff_id = c2.selectbox(
                 "内服実施職員", 
-                options=list(staff_options_with_none.keys()), 
-                format_func=lambda x: staff_options_with_none.get(x), 
-                index=medication_staff_selected_index,
-                disabled=disable_med_staff_input,
-                key="medication_staff_id_selectbox"
+                options=staff_keys, 
+                format_func=lambda x: staff_options.get(x), 
+                index=medication_staff_index,
+                disabled=disable_med_staff_input
             )
             
             c1, c2 = st.columns(2)
-            oral_care_check = c1.checkbox("口腔ケア実施", value=log_data['oral_care_check'] if log_data and log_data['oral_care_check'] is not None else False, key="oral_check_input")
+            oral_care_check = c1.checkbox("口腔ケア実施", value=bool(log_data['oral_care_check']))
             
-            oral_care_staff_selected_index = 0
-            if log_data and log_data['oral_care_staff_id'] is not None:
+            oral_care_staff_index = None
+            if log_data and log_data['oral_care_staff_id'] is not None and log_data['oral_care_staff_id'] in staff_keys:
                 try:
-                    oral_care_staff_selected_index = list(staff_options_with_none.keys()).index(log_data['oral_care_staff_id'])
+                    oral_care_staff_index = staff_keys.index(log_data['oral_care_staff_id'])
                 except ValueError:
                     pass
 
-            # 口腔ケア実施が未チェックの場合、または臨時利用者ではない場合のみ disabled
-            disable_oral_staff_input = (not oral_care_check) and (not is_temporary_user_for_log_date)
+            disable_oral_staff_input = not oral_care_check
             oral_care_staff_id = c2.selectbox(
                 "口腔ケア実施職員", 
-                options=list(staff_options_with_none.keys()), 
-                format_func=lambda x: staff_options_with_none.get(x), 
-                index=oral_care_staff_selected_index,
-                disabled=disable_oral_staff_input,
-                key="oral_care_staff_id_selectbox"
+                options=staff_keys, 
+                format_func=lambda x: staff_options.get(x), 
+                index=oral_care_staff_index,
+                disabled=disable_oral_staff_input
             )
 
             st.write("---")
             st.write("##### 入浴")
-            bath_check = st.checkbox("入浴実施", value=log_data['bath_check'] if log_data and log_data['bath_check'] is not None else False, key="bath_check_input")
+            bath_check = st.checkbox("入浴実施", value=bool(log_data['bath_check']))
             c1, c2, c3, c4 = st.columns(4)
             
             # Convert stored time string to datetime.time object for time_input
-            bath_start_time_val = None
+            bath_start_time_val = time(9, 0)
             if log_data and log_data['bath_start_time']:
                 try:
                     bath_start_time_val = datetime.strptime(log_data['bath_start_time'], '%H:%M:%S').time()
-                except ValueError:
-                    bath_start_time_val = time(9, 0) # Default if parsing fails
-            else:
-                bath_start_time_val = time(9, 0) # Default if None from DB
+                except (ValueError, TypeError):
+                    pass # Keep default
 
-            bath_end_time_val = None
+            bath_end_time_val = time(10, 0)
             if log_data and log_data['bath_end_time']:
                 try:
                     bath_end_time_val = datetime.strptime(log_data['bath_end_time'], '%H:%M:%S').time()
-                except ValueError:
-                    bath_end_time_val = time(10, 0) # Default if parsing fails
-            else:
-                bath_end_time_val = time(10, 0) # Default if None from DB
+                except (ValueError, TypeError):
+                    pass # Keep default
 
-            # 入浴実施が未チェックの場合、または臨時利用者ではない場合のみ disabled
-            disable_bath_input = (not bath_check) and (not is_temporary_user_for_log_date)
+            disable_bath_input = not bath_check
 
-            bath_start_time = c1.time_input("入浴開始時間", value=bath_start_time_val, disabled=disable_bath_input, key="bath_start_time_input")
+            bath_start_time = c1.time_input("入浴開始時間", value=bath_start_time_val, disabled=disable_bath_input)
             
-            bath_start_staff_selected_index = 0
-            if log_data and log_data['bath_start_staff_id'] is not None:
+            bath_start_staff_index = None
+            if log_data and log_data['bath_start_staff_id'] is not None and log_data['bath_start_staff_id'] in staff_keys:
                 try:
-                    bath_start_staff_selected_index = list(staff_options_with_none.keys()).index(log_data['bath_start_staff_id'])
+                    bath_start_staff_index = staff_keys.index(log_data['bath_start_staff_id'])
                 except ValueError:
                     pass
             bath_start_staff_id = c2.selectbox(
                 "開始記録職員", 
-                options=list(staff_options_with_none.keys()), 
-                format_func=lambda x: staff_options_with_none.get(x), 
-                index=bath_start_staff_selected_index, 
-                key="bath_start_staff_selectbox",
+                options=staff_keys, 
+                format_func=lambda x: staff_options.get(x), 
+                index=bath_start_staff_index, 
+                key="bath_start_staff",
                 disabled=disable_bath_input
             )
             
-            bath_end_time = c3.time_input("入浴終了時間", value=bath_end_time_val, disabled=disable_bath_input, key="bath_end_time_input")
+            bath_end_time = c3.time_input("入浴終了時間", value=bath_end_time_val, disabled=disable_bath_input)
             
-            bath_end_staff_selected_index = 0
-            if log_data and log_data['bath_end_staff_id'] is not None:
+            bath_end_staff_index = None
+            if log_data and log_data['bath_end_staff_id'] is not None and log_data['bath_end_staff_id'] in staff_keys:
                 try:
-                    bath_end_staff_selected_index = list(staff_options_with_none.keys()).index(log_data['bath_end_staff_id'])
+                    bath_end_staff_index = staff_keys.index(log_data['bath_end_staff_id'])
                 except ValueError:
                     pass
             bath_end_staff_id = c4.selectbox(
                 "終了記録職員", 
-                options=list(staff_options_with_none.keys()), 
-                format_func=lambda x: staff_options_with_none.get(x), 
-                index=bath_end_staff_selected_index, 
-                key="bath_end_staff_selectbox",
+                options=staff_keys, 
+                format_func=lambda x: staff_options.get(x), 
+                index=bath_end_staff_index, 
+                key="bath_end_staff",
                 disabled=disable_bath_input
             )
 
             st.write("---")
-            health_notes = st.text_area("特記（体調面）", value=log_data['health_notes'] if log_data and log_data['health_notes'] is not None else "", key="health_notes_input")
-            memo1 = st.text_area("その他１", value=log_data['memo1'] if log_data and log_data['memo1'] is not None else "", key="memo1_input")
-            memo2 = st.text_area("その他２", value=log_data['memo2'] if log_data and log_data['memo2'] is not None else "", key="memo2_input")
+            health_notes = st.text_area("特記（体調面）", value=log_data['health_notes'] or "")
+            memo1 = st.text_area("その他１", value=log_data['memo1'] or "")
+            memo2 = st.text_area("その他２", value=log_data['memo2'] or "")
 
             submitted = st.form_submit_button("日誌を保存")
             if submitted:
                 conn = get_db_connection()
-                # Use current values from Streamlit widgets, not log_data, as they reflect user input
-                conn.execute('''
-                    UPDATE daily_logs 
-                    SET is_absent=?, temperature=?, pulse=?, spo2=?, bp_high=?, bp_low=?, 
-                        medication_check=?, medication_staff_id=?, bath_check=?, bath_start_time=?, 
-                        bath_start_staff_id=?, bath_end_time=?, bath_end_staff_id=?, oral_care_check=?, 
-                        oral_care_staff_id=?, weight=?, health_notes=?, memo1=?, memo2=?
-                    WHERE id = ?
-                ''', (is_absent, temperature, pulse, spo2, bp_high, bp_low, 
-                      medication_check, medication_staff_id, 
-                      bath_check, bath_start_time.strftime('%H:%M:%S') if bath_start_time else None, # Store time as string
-                      bath_start_staff_id, bath_end_time.strftime('%H:%M:%S') if bath_end_time else None, # Store time as string
-                      bath_end_staff_id, oral_care_check,
-                      oral_care_staff_id, weight, health_notes, memo1, memo2, log_id))
-                conn.commit()
-                conn.close()
-                st.success("日誌を保存しました。")
+                try:
+                    conn.execute('''
+                        UPDATE daily_logs 
+                        SET is_absent=?, temperature=?, pulse=?, spo2=?, bp_high=?, bp_low=?, 
+                            medication_check=?, medication_staff_id=?, bath_check=?, bath_start_time=?, 
+                            bath_start_staff_id=?, bath_end_time=?, bath_end_staff_id=?, oral_care_check=?, 
+                            oral_care_staff_id=?, weight=?, health_notes=?, memo1=?, memo2=?
+                        WHERE id = ?
+                    ''', (is_absent, temperature, pulse, spo2, bp_high, bp_low, 
+                          medication_check, medication_staff_id if medication_check else None, 
+                          bath_check, bath_start_time.strftime('%H:%M:%S') if bath_check else None,
+                          bath_start_staff_id if bath_check else None, 
+                          bath_end_time.strftime('%H:%M:%S') if bath_check else None,
+                          bath_end_staff_id if bath_check else None, 
+                          oral_care_check, oral_care_staff_id if oral_care_check else None, 
+                          weight, health_notes, memo1, memo2, log_id))
+                    conn.commit()
+                    st.success("日誌を保存しました。")
+                except Exception as e:
+                    st.error(f"保存中にエラーが発生しました: {e}")
+                finally:
+                    conn.close()
     else:
         st.info("利用者と利用日を選択してください。")
 
@@ -631,13 +623,15 @@ def show_excretion_page():
     user_options = {user['id']: user['name'] for user in users}
     
     staff = get_staff_list()
-    # Create staff_options including a "選択してください" for None
-    staff_options_with_none = {None: "選択してください"}
-    staff_options_with_none.update({s['id']: s['name'] for s in staff})
+    staff_options = {s['id']: s['name'] for s in staff}
+    staff_options_with_none = {None: "なし"}
+    staff_options_with_none.update(staff_options)
+
 
     # Get current date and time in JST
-    current_jst_date = datetime.now(JST).date()
-    current_jst_time = datetime.now(JST).time()
+    now_jst = datetime.now(JST)
+    current_jst_date = now_jst.date()
+    current_jst_time = now_jst.time()
 
     # Pre-select user and date if coming from log list
     initial_user_id = st.session_state.get('selected_user_id_for_excretion', None)
@@ -646,16 +640,17 @@ def show_excretion_page():
     c1, c2 = st.columns(2)
 
     # Safely determine the index for the user selectbox
+    user_keys = list(user_options.keys())
     selected_user_index = None
-    if initial_user_id is not None and initial_user_id in user_options:
+    if initial_user_id is not None and initial_user_id in user_keys:
         try:
-            selected_user_index = list(user_options.keys()).index(initial_user_id)
+            selected_user_index = user_keys.index(initial_user_id)
         except ValueError:
             pass # index remains None
 
     selected_user_id = c1.selectbox(
         "利用者を選択",
-        options=list(user_options.keys()),
+        options=user_keys,
         format_func=lambda x: user_options.get(x),
         index=selected_user_index
     )
@@ -664,268 +659,150 @@ def show_excretion_page():
     if selected_user_id and log_date:
         log_id = get_or_create_log_id(selected_user_id, log_date)
         
-        with st.form("excretion_form"):
+        with st.form("excretion_form", clear_on_submit=True):
             st.write(f"##### {user_options[selected_user_id]}さんの排泄記録")
             
             c1, c2 = st.columns(2)
-            excretion_time = c1.time_input("排泄時間", value=current_jst_time, key="excretion_time_input")
-            excretion_type = c2.selectbox("分類", ["尿", "便"], index=None, key="excretion_type_selectbox") # Start with no default selection
+            excretion_time = c1.time_input("排泄時間", value=current_jst_time)
+            excretion_type = c2.selectbox("分類", ["尿", "便"], index=None)
             
             c1, c2 = st.columns(2)
-            # For staff1_id:
-            staff1_selected_index = 0
-            staff1_id = c1.selectbox(
-                "排泄介助職員1", 
-                options=list(staff_options_with_none.keys()), 
-                format_func=lambda x: staff_options_with_none.get(x), 
-                index=staff1_selected_index,
-                key="excretion_staff1_selectbox"
-            )
             
-            # For staff2_id:
-            staff2_selected_index = 0
-            staff2_id = c2.selectbox(
-                "排泄介助職員2", 
-                options=list(staff_options_with_none.keys()), 
-                format_func=lambda x: staff_options_with_none.get(x), 
-                index=staff2_selected_index,
-                key="excretion_staff2_selectbox"
-            )
+            staff1_id = c1.selectbox("排泄介助職員1", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=None)
             
-            notes = st.text_area("特記事項（体調面）", key="excretion_notes_textarea")
+            staff2_id = c2.selectbox("排泄介助職員2", options=list(staff_options_with_none.keys()), format_func=lambda x: staff_options_with_none.get(x), index=0)
+            
+            notes = st.text_area("特記事項")
             
             submitted = st.form_submit_button("記録を追加")
             
             if submitted:
                 if excretion_type and staff1_id:
                     conn = get_db_connection()
-                    conn.execute(
-                        'INSERT INTO excretions (log_id, excretion_time, type, staff1_id, staff2_id, notes) VALUES (?, ?, ?, ?, ?, ?)',
-                        (log_id, excretion_time.strftime('%H:%M:%S'), excretion_type, staff1_id, staff2_id, notes)
-                    )
-                    conn.commit()
-                    conn.close()
-                    st.success("排泄記録を追加しました。")
-                    st.rerun() # Rerun to refresh the list of records
+                    try:
+                        conn.execute(
+                            'INSERT INTO excretions (log_id, excretion_time, type, staff1_id, staff2_id, notes) VALUES (?, ?, ?, ?, ?, ?)',
+                            (log_id, excretion_time.strftime('%H:%M:%S'), excretion_type, staff1_id, staff2_id, notes)
+                        )
+                        conn.commit()
+                        st.success("排泄記録を追加しました。")
+                    except Exception as e:
+                        st.error(f"登録中にエラーが発生しました: {e}")
+                    finally:
+                        conn.close()
                 else:
                     st.error("分類と介助職員1は必須です。")
+
+        # Rerun is handled by form clear_on_submit, but manual success message helps.
+        # To refresh the list below, we must read data after the form submission.
 
         # 記録一覧の表示
         st.write("---")
         st.write("##### 本日の記録一覧")
         conn = get_db_connection()
-        records_df = pd.read_sql_query(f'''
-            SELECT 
-                e.excretion_time AS '時間',
-                e.type AS '分類',
-                s1.name AS '介助職員1',
-                s2.name AS '介助職員2',
-                e.notes AS '特記事項'
-            FROM excretions e
-            LEFT JOIN staff s1 ON e.staff1_id = s1.id
-            LEFT JOIN staff s2 ON e.staff2_id = s2.id
-            WHERE e.log_id = {log_id}
-            ORDER BY e.excretion_time
-        ''', conn)
-        conn.close()
-        st.dataframe(records_df, use_container_width=True)
+        try:
+            records_df = pd.read_sql_query(f'''
+                SELECT 
+                    e.id,
+                    e.excretion_time AS '時間',
+                    e.type AS '分類',
+                    s1.name AS '介助職員1',
+                    s2.name AS '介助職員2',
+                    e.notes AS '特記事項'
+                FROM excretions e
+                LEFT JOIN staff s1 ON e.staff1_id = s1.id
+                LEFT JOIN staff s2 ON e.staff2_id = s2.id
+                WHERE e.log_id = {log_id}
+                ORDER BY e.excretion_time
+            ''', conn, index_col='id')
+            
+            if not records_df.empty:
+              st.dataframe(records_df, use_container_width=True)
+            else:
+              st.info("この利用者の本日の排泄記録はまだありません。")
+
+        except Exception as e:
+            st.error(f"記録の読み込み中にエラーが発生しました: {e}")
+        finally:
+             conn.close()
+
 
 def show_absence_page():
     """欠席入力ページ"""
     st.header("欠席入力")
 
     users = get_user_list()
-    user_options_dict = {user['id']: user['name'] for user in users}
-    
-    # Options for the selectbox, including a "選択してください" option
-    # The actual values corresponding to these options
-    selectable_user_options_for_selectbox = [("選択してください", None)] + [(user_options_dict[uid], uid) for uid in user_options_dict]
-    
-    # Extract just the display names for the Streamlit selectbox options parameter
-    display_user_names = [option[0] for option in selectable_user_options_for_selectbox]
+    user_options = {user['id']: user['name'] for user in users}
     
     staff = get_staff_list()
-    staff_options_with_none = {None: "選択してください"}
-    staff_options_with_none.update({s['id']: s['name'] for s in staff})
+    staff_options = {s['id']: s['name'] for s in staff}
 
+    # Get current date in JST
     current_jst_date = datetime.now(JST).date()
 
+    # Pre-select user if coming from log list
     initial_user_id = st.session_state.get('selected_user_id_for_absence', None)
     initial_log_date = st.session_state.get('selected_log_date', current_jst_date)
-
-    # Safely determine the initial index for the user selectbox
-    selected_user_initial_index = 0 # Default to "選択してください"
-    if initial_user_id is not None:
-        try:
-            # Find the index of the initial_user_id within the `selectable_user_options_for_selectbox` tuples
-            for i, (name, uid) in enumerate(selectable_user_options_for_selectbox):
-                if uid == initial_user_id:
-                    selected_user_initial_index = i
-                    break
-        except ValueError:
-            pass # Keep default index 0 if not found
-
-    selected_user_display_name = st.selectbox(
-        "欠席者を選択",
-        options=display_user_names,
-        index=selected_user_initial_index,
-        key="absence_user_select"
-    )
     
-    # Get the actual selected user ID based on the display name chosen by the user
-    # This correctly maps "選択してください" back to None, or a user name to their ID.
-    selected_user_id = selectable_user_options_for_selectbox[display_user_names.index(selected_user_display_name)][1]
+    user_keys = list(user_options.keys())
+    # Safely determine the index for the user selectbox
+    selected_user_index = None
+    if initial_user_id is not None and initial_user_id in user_keys:
+        try:
+            selected_user_index = user_keys.index(initial_user_id)
+        except ValueError:
+            pass # index remains None
 
-    with st.form("absence_form"):
-        if selected_user_id is None: # If "選択してください" is selected
-            st.info("欠席者を選択してください。")
-            submitted = st.form_submit_button("欠席情報を登録/更新", key="submit_absence_form", disabled=True) # Disable if no user selected
-        else: # A valid user is selected
-            # Load existing absence data if available for the selected user and initial log date
-            conn = get_db_connection()
-            existing_absence = conn.execute(
-                'SELECT * FROM absences WHERE user_id = ? AND reception_date = ? ORDER BY id DESC LIMIT 1',
-                (selected_user_id, initial_log_date.strftime('%Y-%m-%d'))
-            ).fetchone()
-            conn.close()
+    selected_user_id = st.selectbox(
+        "欠席者を選択",
+        options=user_keys,
+        format_func=lambda x: user_options.get(x),
+        index=selected_user_index,
+        placeholder="利用者を選択してください"
+    )
 
-            initial_reception_staff_id = existing_absence['reception_staff_id'] if existing_absence else None
-            initial_reception_date = datetime.strptime(existing_absence['reception_date'], '%Y-%m-%d').date() if existing_absence and existing_absence['reception_date'] else initial_log_date
-            initial_contact_person = existing_absence['contact_person'] if existing_absence else ""
-            initial_absence_start_date = datetime.strptime(existing_absence['absence_start_date'], '%Y-%m-%d').date() if existing_absence and existing_absence['absence_start_date'] else initial_log_date
-            initial_absence_end_date = datetime.strptime(existing_absence['absence_end_date'], '%Y-%m-%d').date() if existing_absence and existing_absence['absence_end_date'] else initial_log_date
-            
-            initial_reason_type = existing_absence['reason_type'] if existing_absence else "本人体調不良"
-            initial_reason_details = json.loads(existing_absence['reason_details']) if existing_absence and existing_absence['reason_details'] else {}
-            initial_support_content = json.loads(existing_absence['support_content']) if existing_absence and existing_absence['support_content'] else {}
-
-            st.write(f"##### {user_options_dict[selected_user_id]}さんの欠席情報")
+    if selected_user_id:
+        with st.form("absence_form", clear_on_submit=True):
+            st.write(f"##### {user_options[selected_user_id]}さんの欠席情報")
             c1, c2 = st.columns(2)
             
-            reception_staff_selected_index = 0
-            if initial_reception_staff_id is not None:
-                try:
-                    reception_staff_selected_index = list(staff_options_with_none.keys()).index(initial_reception_staff_id)
-                except ValueError:
-                    pass
+            staff_keys = list(staff_options.keys())
+            reception_staff_id = c1.selectbox("受付職員", options=staff_keys, format_func=lambda x: staff_options.get(x), index=None, placeholder="職員を選択してください")
+            reception_date = c2.date_input("受付日", initial_log_date)
 
-            reception_staff_id = c1.selectbox(
-                "受付職員", 
-                options=list(staff_options_with_none.keys()), 
-                format_func=lambda x: staff_options_with_none.get(x), 
-                index=reception_staff_selected_index,
-                key="reception_staff_selectbox_absence"
-            )
-            reception_date = c2.date_input("受付日", initial_reception_date, key="reception_date_absence")
-
-            contact_person = st.text_input("欠席の連絡者", value=initial_contact_person, key="contact_person_absence")
+            contact_person = st.text_input("欠席の連絡者")
             
             c1, c2 = st.columns(2)
-            absence_start_date = c1.date_input("欠席期間（開始）", initial_absence_start_date, key="absence_start_date_absence")
-            absence_end_date = c2.date_input("欠席期間（終了）", initial_absence_end_date, key="absence_end_date_absence")
+            absence_start_date = c1.date_input("欠席期間（開始）", initial_log_date)
+            absence_end_date = c2.date_input("欠席期間（終了）", initial_log_date)
             
-            st.write("---")
-            st.write("##### 欠席理由")
-            reason_type = st.radio(
-                "欠席理由の分類",
-                ("本人の体調不良", "本人の体調不良以外"),
-                index=("本人の体調不良", "本人の体調不良以外").index(initial_reason_type),
-                key="reason_type_absence"
-            )
+            reason = st.text_area("欠席理由（詳細を記入）", help="例：本人の体調不良（発熱38.0℃、咳あり）のため。")
+            support = st.text_area("援助内容（詳細を記入）", help="例：体調確認、医療機関の受診を勧めた。")
 
-            reason_details = {}
-
-            if reason_type == "本人の体調不良":
-                st.write("###### 体調不良の詳細")
-                col_sick1, col_sick2, col_sick3, col_sick4 = st.columns(4)
-                with col_sick1:
-                    reason_details['発作'] = st.checkbox("発作", value=initial_reason_details.get('発作', False), key="sick_hassaku_absence")
-                    reason_details['発熱'] = st.checkbox("発熱", value=initial_reason_details.get('発熱', False), key="sick_hatsunetsu_absence")
-                with col_sick2:
-                    reason_details['嘔吐'] = st.checkbox("嘔吐", value=initial_reason_details.get('嘔吐', False), key="sick_outo_absence")
-                    reason_details['咳'] = st.checkbox("咳", value=initial_reason_details.get('咳', False), key="sick_seki_absence")
-                with col_sick3:
-                    reason_details['鼻水'] = st.checkbox("鼻水", value=initial_reason_details.get('鼻水', False), key="sick_hanamizu_absence")
-                    reason_details['下痢'] = st.checkbox("下痢", value=initial_reason_details.get('下痢', False), key="sick_geri_absence")
-                with col_sick4:
-                    reason_details['機嫌不良'] = st.checkbox("機嫌不良", value=initial_reason_details.get('機嫌不良', False), key="sick_kigenfuryo_absence")
-                    reason_details['発疹'] = st.checkbox("発疹", value=initial_reason_details.get('発疹', False), key="sick_hasshin_absence")
-                reason_details['その他_本人体調不良'] = st.text_area("その他（本人の体調不良）", value=initial_reason_details.get('その他_本人体調不良', ""), key="sick_other_absence")
-            else: # 本人の体調不良以外
-                st.write("###### 体調不良以外の理由の詳細")
-                reason_details['家族の都合'] = st.checkbox("家族の都合", value=initial_reason_details.get('家族の都合', False), key="reason_kazoku_tsugou_absence")
-                reason_details['家族の体調不良'] = st.checkbox("家族の体調不良", value=initial_reason_details.get('家族の体調不良', False), key="reason_kazoku_taichofuryo_absence")
-                if reason_details['家族の体調不良']:
-                    reason_details['家族の体調不良_誰が'] = st.text_input("誰が？", value=initial_reason_details.get('家族の体調不良_誰が', ""), key="reason_kazoku_taichofuryo_darega_absence")
-                
-                reason_details['定期受診'] = st.checkbox("定期受診", value=initial_reason_details.get('定期受診', False), key="reason_teikijushin_absence")
-                if reason_details['定期受診']:
-                    reason_details['定期受診_受診先'] = st.text_input("受診先", value=initial_reason_details.get('定期受診_受診先', ""), key="reason_teikijushin_jushinsaki_absence")
-                
-                reason_details['その他_本人体調不良以外'] = st.text_area("その他（本人の体調不良以外）", value=initial_reason_details.get('その他_本人体調不良以外', ""), key="reason_other_else_absence")
-
-            st.write("---")
-            st.write("##### 援助内容")
-            support_content = {}
-
-            support_content['体調を確認した'] = st.checkbox("体調を確認した", value=initial_support_content.get('体調を確認した', False), key="support_taichoukakunin_absence")
-            if support_content['体調を確認した']:
-                support_content['体調を確認した_内容'] = st.text_area("内容（体調確認）", value=initial_support_content.get('体調を確認した_内容', ""), key="support_taichoukakunin_naiyou_absence")
-            
-            support_content['医療機関の受診を勧めた'] = st.checkbox("医療機関の受診を勧めた", value=initial_support_content.get('医療機関の受診を勧めた', False), key="support_iryokikan_absence")
-            if support_content['医療機関の受診を勧めた']:
-                support_content['医療機関の受診を勧めた_内容'] = st.text_input("内容（受診勧告）", value=initial_support_content.get('医療機関の受診を勧めた_内容', ""), key="support_iryokikan_naiyou_absence")
-            
-            support_content['次回利用日を確認した'] = st.checkbox("次回利用日を確認した", value=initial_support_content.get('次回利用日を確認した', False), key="support_jikairiyoubi_absence")
-            if support_content['次回利用日を確認した']:
-                initial_next_use_date = None
-                if '次回利用日を確認した_日付' in initial_support_content and initial_support_content['次回利用日を確認した_日付']:
-                    try:
-                        initial_next_use_date = datetime.strptime(initial_support_content['次回利用日を確認した_日付'], '%Y-%m-%d').date()
-                    except ValueError:
-                        pass
-                
-                support_content['次回利用日を確認した_日付'] = st.date_input("日付", value=initial_next_use_date or current_jst_date, key="support_jikairiyoubi_date_absence")
-            
-            support_content['その他_援助内容'] = st.checkbox("その他（援助内容）", value=initial_support_content.get('その他_援助内容', False), key="support_other_absence")
-            if support_content['その他_援助内容']:
-                support_content['その他_援助内容_内容'] = st.text_area("内容（その他援助）", value=initial_support_content.get('その他_援助内容_内容', ""), key="support_other_naiyou_absence")
-
-            submitted = st.form_submit_button("欠席情報を登録/更新", key="submit_absence_form") # Submit button for the form
-            
+            submitted = st.form_submit_button("欠席情報を登録")
             if submitted:
-                conn = get_db_connection()
-                
-                absence_start_date_str = absence_start_date.strftime('%Y-%m-%d')
-                absence_end_date_str = absence_end_date.strftime('%Y-%m-%d')
-                reception_date_str = reception_date.strftime('%Y-%m-%d')
-
-                if '次回利用日を確認した_日付' in support_content and isinstance(support_content['次回利用日を確認した_日付'], datetime.date):
-                    support_content['次回利用日を確認した_日付'] = support_content['次回利用日を確認した_日付'].strftime('%Y-%m-%d')
-
-                reason_details_json = json.dumps(reason_details, ensure_ascii=False)
-                support_content_json = json.dumps(support_content, ensure_ascii=False)
-
-                if existing_absence:
-                    conn.execute('''
-                        UPDATE absences
-                        SET reception_date=?, reception_staff_id=?, contact_person=?, 
-                            absence_start_date=?, absence_end_date=?, reason_type=?, 
-                            reason_details=?, support_content=?
-                        WHERE id = ?
-                    ''', (reception_date_str, reception_staff_id, contact_person, 
-                          absence_start_date_str, absence_end_date_str, reason_type, 
-                          reason_details_json, support_content_json, existing_absence['id']))
-                    st.success("欠席情報を更新しました。")
+                if reception_staff_id and reason:
+                    try:
+                        # データベースへの保存処理
+                        conn = get_db_connection()
+                        conn.execute('''
+                            INSERT INTO absences (user_id, reception_date, reception_staff_id, contact_person, absence_start_date, absence_end_date, reason, support_content)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (selected_user_id, reception_date, reception_staff_id, contact_person, absence_start_date, absence_end_date, reason, support))
+                        
+                        # 同日の日誌を欠席に更新
+                        log_id = get_or_create_log_id(selected_user_id, absence_start_date)
+                        conn.execute('UPDATE daily_logs SET is_absent = 1 WHERE id = ?', (log_id,))
+                        
+                        conn.commit()
+                        st.success("欠席情報を登録し、該当日誌を「欠席」に更新しました。")
+                    except Exception as e:
+                        st.error(f"登録中にエラーが発生しました: {e}")
+                    finally:
+                        if conn:
+                            conn.close()
                 else:
-                    conn.execute('''
-                        INSERT INTO absences (user_id, reception_date, reception_staff_id, contact_person, absence_start_date, absence_end_date, reason_type, reason_details, support_content)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (selected_user_id, reception_date_str, reception_staff_id, contact_person, absence_start_date_str, absence_end_date_str, reason_type, reason_details_json, support_content_json))
-                    st.success("欠席情報を登録しました。")
-                
-                conn.commit()
-                conn.close()
+                    st.error("受付職員と欠席理由は必須です。")
 
 
 # --- メインのアプリケーション実行部分 ---
@@ -944,22 +821,13 @@ def main():
     
     # サイドバーのボタンでページを切り替える
     for option in menu_options:
-        if st.sidebar.button(option):
+        if st.sidebar.button(option, key=f"menu_{option}"):
             st.session_state.page = option
             # Clear specific session state variables when navigating from sidebar
             # to prevent pre-filling forms unexpectedly when not coming from list page
-            if option != "日誌入力":
-                if 'selected_user_id_for_log' in st.session_state:
-                    del st.session_state.selected_user_id_for_log
-            if option != "排泄入力":
-                if 'selected_user_id_for_excretion' in st.session_state:
-                    del st.session_state.selected_user_id_for_excretion
-            if option != "欠席入力":
-                if 'selected_user_id_for_absence' in st.session_state:
-                    del st.session_state.selected_user_id_for_absence
-            # Always clear selected_log_date unless staying on a related page (though input pages will set it)
-            if 'selected_log_date' in st.session_state:
-                del st.session_state.selected_log_date
+            for key in ['selected_user_id_for_log', 'selected_user_id_for_excretion', 'selected_user_id_for_absence', 'selected_log_date']:
+                if key in st.session_state:
+                    del st.session_state[key]
             st.rerun() 
 
 
@@ -981,4 +849,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
