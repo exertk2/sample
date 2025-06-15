@@ -419,7 +419,9 @@ def show_log_input_page():
     user_options = {user['id']: user['name'] for user in users}
     
     staff = get_staff_list()
-    staff_options = {s['id']: s['name'] for s in staff}
+    # Create staff_options including a "選択してください" for None
+    staff_options_with_none = {None: "選択してください"}
+    staff_options_with_none.update({s['id']: s['name'] for s in staff})
     
     # Get current date in JST
     current_jst_date = datetime.now(JST).date()
@@ -492,31 +494,32 @@ def show_log_input_page():
             c1, c2 = st.columns(2)
             medication_check = c1.checkbox("内服実施", value=log_data['medication_check'] if log_data and log_data['medication_check'] is not None else False)
             
-            medication_staff_index = None
-            if log_data and log_data['medication_staff_id'] is not None and log_data['medication_staff_id'] in staff_options:
+            medication_staff_selected_index = 0 
+            if log_data and log_data['medication_staff_id'] is not None:
                 try:
-                    medication_staff_index = list(staff_options.keys()).index(log_data['medication_staff_id'])
+                    medication_staff_selected_index = list(staff_options_with_none.keys()).index(log_data['medication_staff_id'])
                 except ValueError:
-                    pass
+                    pass # Keep default if not found
             
             # 内服実施が未チェックの場合、または臨時利用者ではない場合のみ disabled
             # つまり、臨時利用者の場合は内服実施が未チェックでも入力可能
             disable_med_staff_input = (not medication_check) and (not is_temporary_user_for_log_date)
             medication_staff_id = c2.selectbox(
                 "内服実施職員", 
-                options=list(staff_options.keys()), 
-                format_func=lambda x: staff_options.get(x), 
-                index=medication_staff_index,
-                disabled=disable_med_staff_input
+                options=list(staff_options_with_none.keys()), 
+                format_func=lambda x: staff_options_with_none.get(x), 
+                index=medication_staff_selected_index,
+                disabled=disable_med_staff_input,
+                key="medication_staff_id_selectbox"
             )
             
             c1, c2 = st.columns(2)
             oral_care_check = c1.checkbox("口腔ケア実施", value=log_data['oral_care_check'] if log_data and log_data['oral_care_check'] is not None else False)
             
-            oral_care_staff_index = None
-            if log_data and log_data['oral_care_staff_id'] is not None and log_data['oral_care_staff_id'] in staff_options:
+            oral_care_staff_selected_index = 0
+            if log_data and log_data['oral_care_staff_id'] is not None:
                 try:
-                    oral_care_staff_index = list(staff_options.keys()).index(log_data['oral_care_staff_id'])
+                    oral_care_staff_selected_index = list(staff_options_with_none.keys()).index(log_data['oral_care_staff_id'])
                 except ValueError:
                     pass
 
@@ -524,10 +527,11 @@ def show_log_input_page():
             disable_oral_staff_input = (not oral_care_check) and (not is_temporary_user_for_log_date)
             oral_care_staff_id = c2.selectbox(
                 "口腔ケア実施職員", 
-                options=list(staff_options.keys()), 
-                format_func=lambda x: staff_options.get(x), 
-                index=oral_care_staff_index,
-                disabled=disable_oral_staff_input
+                options=list(staff_options_with_none.keys()), 
+                format_func=lambda x: staff_options_with_none.get(x), 
+                index=oral_care_staff_selected_index,
+                disabled=disable_oral_staff_input,
+                key="oral_care_staff_id_selectbox"
             )
 
             st.write("---")
@@ -559,35 +563,35 @@ def show_log_input_page():
 
             bath_start_time = c1.time_input("入浴開始時間", value=bath_start_time_val, disabled=disable_bath_input)
             
-            bath_start_staff_index = None
-            if log_data and log_data['bath_start_staff_id'] is not None and log_data['bath_start_staff_id'] in staff_options:
+            bath_start_staff_selected_index = 0
+            if log_data and log_data['bath_start_staff_id'] is not None:
                 try:
-                    bath_start_staff_index = list(staff_options.keys()).index(log_data['bath_start_staff_id'])
+                    bath_start_staff_selected_index = list(staff_options_with_none.keys()).index(log_data['bath_start_staff_id'])
                 except ValueError:
                     pass
             bath_start_staff_id = c2.selectbox(
                 "開始記録職員", 
-                options=list(staff_options.keys()), 
-                format_func=lambda x: staff_options.get(x), 
-                index=bath_start_staff_index, 
-                key="bath_start_staff",
+                options=list(staff_options_with_none.keys()), 
+                format_func=lambda x: staff_options_with_none.get(x), 
+                index=bath_start_staff_selected_index, 
+                key="bath_start_staff_selectbox",
                 disabled=disable_bath_input
             )
             
             bath_end_time = c3.time_input("入浴終了時間", value=bath_end_time_val, disabled=disable_bath_input)
             
-            bath_end_staff_index = None
-            if log_data and log_data['bath_end_staff_id'] is not None and log_data['bath_end_staff_id'] in staff_options:
+            bath_end_staff_selected_index = 0
+            if log_data and log_data['bath_end_staff_id'] is not None:
                 try:
-                    bath_end_staff_index = list(staff_options.keys()).index(log_data['bath_end_staff_id'])
+                    bath_end_staff_selected_index = list(staff_options_with_none.keys()).index(log_data['bath_end_staff_id'])
                 except ValueError:
                     pass
             bath_end_staff_id = c4.selectbox(
                 "終了記録職員", 
-                options=list(staff_options.keys()), 
-                format_func=lambda x: staff_options.get(x), 
-                index=bath_end_staff_index, 
-                key="bath_end_staff",
+                options=list(staff_options_with_none.keys()), 
+                format_func=lambda x: staff_options_with_none.get(x), 
+                index=bath_end_staff_selected_index, 
+                key="bath_end_staff_selectbox",
                 disabled=disable_bath_input
             )
 
@@ -627,10 +631,9 @@ def show_excretion_page():
     user_options = {user['id']: user['name'] for user in users}
     
     staff = get_staff_list()
-    staff_options = {s['id']: s['name'] for s in staff}
-    # Ensure None is a key if it's a possible selection, and handle its index
-    if None not in staff_options:
-        staff_options[None] = "なし" 
+    # Create staff_options including a "選択してください" for None
+    staff_options_with_none = {None: "選択してください"}
+    staff_options_with_none.update({s['id']: s['name'] for s in staff})
 
     # Get current date and time in JST
     current_jst_date = datetime.now(JST).date()
@@ -669,21 +672,25 @@ def show_excretion_page():
             excretion_type = c2.selectbox("分類", ["尿", "便"], index=None) # Start with no default selection
             
             c1, c2 = st.columns(2)
-            # Safely determine index for staff selectboxes
-            staff1_index = None
-            # No initial value from DB for new excretion record, so index remains None
-
-            staff1_id = c1.selectbox("排泄介助職員1", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=staff1_index)
+            # For staff1_id:
+            staff1_selected_index = 0
+            staff1_id = c1.selectbox(
+                "排泄介助職員1", 
+                options=list(staff_options_with_none.keys()), 
+                format_func=lambda x: staff_options_with_none.get(x), 
+                index=staff1_selected_index,
+                key="excretion_staff1_selectbox"
+            )
             
-            staff2_index = None
-            # If the option for 'None' exists and we want it as default, find its index.
-            if None in staff_options:
-                 try:
-                     staff2_index = list(staff_options.keys()).index(None)
-                 except ValueError:
-                     pass # Should not happen if None is in staff_options
-            
-            staff2_id = c2.selectbox("排泄介助職員2", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=staff2_index)
+            # For staff2_id:
+            staff2_selected_index = 0
+            staff2_id = c2.selectbox(
+                "排泄介助職員2", 
+                options=list(staff_options_with_none.keys()), 
+                format_func=lambda x: staff_options_with_none.get(x), 
+                index=staff2_selected_index,
+                key="excretion_staff2_selectbox"
+            )
             
             notes = st.text_area("特記事項（体調面）")
             
@@ -731,7 +738,9 @@ def show_absence_page():
     user_options = {user['id']: user['name'] for user in users}
     
     staff = get_staff_list()
-    staff_options = {s['id']: s['name'] for s in staff}
+    # Create staff_options including a "選択してください" for None
+    staff_options_with_none = {None: "選択してください"}
+    staff_options_with_none.update({s['id']: s['name'] for s in staff})
 
     # Get current date in JST
     current_jst_date = datetime.now(JST).date()
@@ -783,15 +792,22 @@ def show_absence_page():
             st.write(f"##### {user_options[selected_user_id]}さんの欠席情報")
             c1, c2 = st.columns(2)
             
-            # Safely determine index for reception staff selectbox
-            reception_staff_index = None
-            if initial_reception_staff_id is not None and initial_reception_staff_id in staff_options:
+            # Determine the index for the reception staff selectbox
+            reception_staff_selected_index = 0 # Default to "選択してください" (which is at index 0 after adding None)
+            if initial_reception_staff_id is not None:
                 try:
-                    reception_staff_index = list(staff_options.keys()).index(initial_reception_staff_id)
+                    reception_staff_selected_index = list(staff_options_with_none.keys()).index(initial_reception_staff_id)
                 except ValueError:
+                    # If initial_reception_staff_id is not found in the list, keep default index 0
                     pass
 
-            reception_staff_id = c1.selectbox("受付職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=reception_staff_index)
+            reception_staff_id = c1.selectbox(
+                "受付職員", 
+                options=list(staff_options_with_none.keys()), 
+                format_func=lambda x: staff_options_with_none.get(x), 
+                index=reception_staff_selected_index,
+                key="reception_staff_selectbox"
+            )
             reception_date = c2.date_input("受付日", initial_reception_date)
 
             contact_person = st.text_input("欠席の連絡者", value=initial_contact_person)
@@ -962,3 +978,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
