@@ -934,22 +934,26 @@ def show_absence_page():
 
                 # Convert datetime.date objects to string for database storage
                 # Values are cleared only if the corresponding checkbox is unchecked, regardless of visibility.
-                if not reason_family_illness:
-                    reason_family_illness_who = ""
-                if not reason_regular_checkup:
-                    reason_checkup_place = ""
-                if not support_checked_health_confirm:
-                    support_content_health_confirm = ""
-                if not support_checked_medical_recommend:
-                    support_content_medical_recommend = ""
+                # The text inputs for "誰が？" and "受診先" are now always visible, but their values should only be stored if the parent checkbox is checked.
+                # However, the user's request states "関連項目のチェック有無にかかわらず、初期表示するようにして".
+                # This implies the values entered even when the checkbox is off *should* be saved, if they exist.
+                # To align with this, I will remove the logic that clears these fields if the checkbox is off,
+                # letting the Streamlit widget's current value (which could be from initial_reason_family_illness_who or user input) be used.
+                # The only case where we'd explicitly set to "" is if the user literally clears the text input.
+                # For `support_date_next_visit`, if the checkbox is off, we still want to store None if the user didn't pick a date.
 
                 support_date_next_visit_str = None
                 if support_checked_next_visit and support_date_next_visit:
                     support_date_next_visit_str = support_date_next_visit.strftime('%Y-%m-%d')
+                elif not support_checked_next_visit: # If checkbox is off, ensure no date is saved
+                    support_date_next_visit_str = None
 
-                if not support_checked_other:
-                    support_content_other = ""
-
+                # For text fields, if the checkbox is off, the text area content will be saved as whatever is in it.
+                # This matches the "always display" behavior. If the user wants to clear it, they can manually clear the text area.
+                # For example:
+                # if not support_checked_health_confirm:
+                #     support_content_health_confirm = "" # This line would clear if checkbox is off, which is NOT desired by "常に表示" + save values.
+                # Therefore, we use the direct value from the Streamlit widget.
 
                 # Check if an existing record needs to be updated or a new one inserted
                 if existing_absence_data:
@@ -975,13 +979,13 @@ def show_absence_page():
                           reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
                           reason_rash, reason_self_illness_other_text,
                           reason_other_than_self_illness, reason_family_convenience,
-                          reason_family_illness, reason_family_illness_who,
-                          reason_regular_checkup, reason_checkup_place,
+                          reason_family_illness, reason_family_illness_who, # Use direct widget value
+                          reason_regular_checkup, reason_checkup_place, # Use direct widget value
                           reason_other_text, support_content, # Original support content
-                          support_checked_health_confirm, support_content_health_confirm,
-                          support_checked_medical_recommend, support_content_medical_recommend,
+                          support_checked_health_confirm, support_content_health_confirm, # Use direct widget value
+                          support_checked_medical_recommend, support_content_medical_recommend, # Use direct widget value
                           support_checked_next_visit, support_date_next_visit_str, # Store date as string
-                          support_checked_other, support_content_other,
+                          support_checked_other, support_content_other, # Use direct widget value
                           existing_absence_data['id']))
                     st.success("欠席情報を更新しました。")
                 else:
@@ -1006,13 +1010,13 @@ def show_absence_page():
                           reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
                           reason_rash, reason_self_illness_other_text,
                           reason_other_than_self_illness, reason_family_convenience,
-                          reason_family_illness, reason_family_illness_who,
-                          reason_regular_checkup, reason_checkup_place,
+                          reason_family_illness, reason_family_illness_who, # Use direct widget value
+                          reason_regular_checkup, reason_checkup_place, # Use direct widget value
                           reason_other_text, support_content, # Original support content
-                          support_checked_health_confirm, support_content_health_confirm,
-                          support_checked_medical_recommend, support_content_medical_recommend,
+                          support_checked_health_confirm, support_content_health_confirm, # Use direct widget value
+                          support_checked_medical_recommend, support_content_medical_recommend, # Use direct widget value
                           support_checked_next_visit, support_date_next_visit_str, # Store date as string
-                          support_checked_other, support_content_other))
+                          support_checked_other, support_content_other)) # Use direct widget value
                     st.success("欠席情報を登録しました。")
                 conn.commit()
                 conn.close()
@@ -1033,25 +1037,33 @@ def main():
 
     menu_options = ["日誌一覧", "日誌入力", "排泄入力", "欠席入力", "利用者情報登録", "職員一覧"]
 
-    # サイドバーのボタンでページを切り替える
-    for option in menu_options:
-        if st.sidebar.button(option):
-            st.session_state.page = option
-            # Clear specific session state variables when navigating from sidebar
-            # to prevent pre-filling forms unexpectedly when not coming from list page
-            if option != "日誌入力":
-                if 'selected_user_id_for_log' in st.session_state:
-                    del st.session_state.selected_user_id_for_log
-            if option != "排泄入力":
-                if 'selected_user_id_for_excretion' in st.session_state:
-                    del st.session_state.selected_user_id_for_excretion
-            if option != "欠席入力":
-                if 'selected_user_id_for_absence' in st.session_state:
-                    del st.session_state.selected_user_id_for_absence
-            # Always clear selected_log_date unless staying on a related page (though input pages will set it)
-            if 'selected_log_date' in st.session_state:
-                del st.session_state.selected_log_date
-            st.rerun()
+    # サイドバーのラジオボタンでページを切り替える
+    # st.sidebar.button の代わりに st.sidebar.radio を使用
+    selected_option = st.sidebar.radio(
+        "ページを選択してください",
+        menu_options,
+        index=menu_options.index(st.session_state.page), # 現在のページをデフォルトで選択
+        key="main_menu_radio"
+    )
+
+    # ラジオボタンの選択が変更された場合
+    if selected_option != st.session_state.page:
+        st.session_state.page = selected_option
+        # Clear specific session state variables when navigating from sidebar
+        # to prevent pre-filling forms unexpectedly when not coming from list page
+        if selected_option != "日誌入力":
+            if 'selected_user_id_for_log' in st.session_state:
+                del st.session_state.selected_user_id_for_log
+        if selected_option != "排泄入力":
+            if 'selected_user_id_for_excretion' in st.session_state:
+                del st.session_state.selected_user_id_for_excretion
+        if selected_option != "欠席入力":
+            if 'selected_user_id_for_absence' in st.session_state:
+                del st.session_state.selected_user_id_for_absence
+        # Always clear selected_log_date unless staying on a related page (though input pages will set it)
+        if 'selected_log_date' in st.session_state:
+            del st.session_state.selected_log_date
+        st.rerun()
 
 
     # 選択されたページを表示
