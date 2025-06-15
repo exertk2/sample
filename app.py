@@ -144,6 +144,16 @@ def create_tables():
         c.execute("ALTER TABLE absences ADD COLUMN reason_regular_checkup BOOLEAN DEFAULT 0")
         c.execute("ALTER TABLE absences ADD COLUMN reason_checkup_place TEXT")
         c.execute("ALTER TABLE absences ADD COLUMN reason_other_text TEXT")
+        # Add new columns for detailed support content
+        c.execute("ALTER TABLE absences ADD COLUMN support_checked_health_confirm BOOLEAN DEFAULT 0")
+        c.execute("ALTER TABLE absences ADD COLUMN support_content_health_confirm TEXT")
+        c.execute("ALTER TABLE absences ADD COLUMN support_checked_medical_recommend BOOLEAN DEFAULT 0")
+        c.execute("ALTER TABLE absences ADD COLUMN support_content_medical_recommend TEXT")
+        c.execute("ALTER TABLE absences ADD COLUMN support_checked_next_visit BOOLEAN DEFAULT 0")
+        c.execute("ALTER TABLE absences ADD COLUMN support_date_next_visit DATE")
+        c.execute("ALTER TABLE absences ADD COLUMN support_checked_other BOOLEAN DEFAULT 0")
+        c.execute("ALTER TABLE absences ADD COLUMN support_content_other TEXT")
+
     except sqlite3.OperationalError as e:
         # This error typically means the column already exists
         if "duplicate column name" not in str(e):
@@ -803,7 +813,7 @@ def show_absence_page():
         initial_absence_end_date = existing_absence_data['absence_end_date'] if existing_absence_data and existing_absence_data['absence_end_date'] else initial_log_date
         initial_support_content = existing_absence_data['support_content'] if existing_absence_data and existing_absence_data['support_content'] is not None else "" # Ensure empty string not None for text_area
 
-        # Detailed reason initial values
+        # Detailed reason initial values (already implemented and displayed always)
         initial_reason_self_illness = existing_absence_data['reason_self_illness'] if existing_absence_data and existing_absence_data['reason_self_illness'] is not None else False
         initial_reason_seizure = existing_absence_data['reason_seizure'] if existing_absence_data and existing_absence_data['reason_seizure'] is not None else False
         initial_reason_fever = existing_absence_data['reason_fever'] if existing_absence_data and existing_absence_data['reason_fever'] is not None else False
@@ -821,6 +831,16 @@ def show_absence_page():
         initial_reason_regular_checkup = existing_absence_data['reason_regular_checkup'] if existing_absence_data and existing_absence_data['reason_regular_checkup'] is not None else False
         initial_reason_checkup_place = existing_absence_data['reason_checkup_place'] if existing_absence_data and existing_absence_data['reason_checkup_place'] is not None else ""
         initial_reason_other_text = existing_absence_data['reason_other_text'] if existing_absence_data and existing_absence_data['reason_other_text'] is not None else ""
+
+        # New initial values for detailed support content
+        initial_support_checked_health_confirm = existing_absence_data['support_checked_health_confirm'] if existing_absence_data and existing_absence_data['support_checked_health_confirm'] is not None else False
+        initial_support_content_health_confirm = existing_absence_data['support_content_health_confirm'] if existing_absence_data and existing_absence_data['support_content_health_confirm'] is not None else ""
+        initial_support_checked_medical_recommend = existing_absence_data['support_checked_medical_recommend'] if existing_absence_data and existing_absence_data['support_checked_medical_recommend'] is not None else False
+        initial_support_content_medical_recommend = existing_absence_data['support_content_medical_recommend'] if existing_absence_data and existing_absence_data['support_content_medical_recommend'] is not None else ""
+        initial_support_checked_next_visit = existing_absence_data['support_checked_next_visit'] if existing_absence_data and existing_absence_data['support_checked_next_visit'] is not None else False
+        initial_support_date_next_visit = datetime.strptime(existing_absence_data['support_date_next_visit'], '%Y-%m-%d').date() if existing_absence_data and existing_absence_data['support_date_next_visit'] else None
+        initial_support_checked_other = existing_absence_data['support_checked_other'] if existing_absence_data and existing_absence_data['support_checked_other'] is not None else False
+        initial_support_content_other = existing_absence_data['support_content_other'] if existing_absence_data and existing_absence_data['support_content_other'] is not None else ""
 
 
         with st.form("absence_form"):
@@ -872,23 +892,60 @@ def show_absence_page():
             # 常に表示されるサブ項目
             reason_family_convenience = st.checkbox("家族の都合", value=initial_reason_family_convenience, key="reason_family_convenience")
             reason_family_illness = st.checkbox("家族の体調不良", value=initial_reason_family_illness, key="reason_family_illness")
-            if reason_family_illness: # この項目は、関連するテキスト入力があるため、チェックボックスの状態に応じて表示を制御
+            # 条件付き表示は維持
+            if reason_family_illness:
                 reason_family_illness_who = st.text_input("誰が？", value=initial_reason_family_illness_who, key="reason_family_illness_who")
             else:
                 reason_family_illness_who = "" # チェックボックスがオフの場合、関連テキストをクリア
             reason_regular_checkup = st.checkbox("定期受診", value=initial_reason_regular_checkup, key="reason_regular_checkup")
-            if reason_regular_checkup: # この項目は、関連するテキスト入力があるため、チェックボックスの状態に応じて表示を制御
+            # 条件付き表示は維持
+            if reason_regular_checkup:
                 reason_checkup_place = st.text_input("受診先", value=initial_reason_checkup_place, key="reason_checkup_place")
             else:
                 reason_checkup_place = "" # チェックボックスがオフの場合、関連テキストをクリア
             reason_other_text = st.text_area("その他（本人の体調不良以外）", value=initial_reason_other_text, key="reason_other_text")
 
-            support_content = st.text_area("援助内容（詳細を記入）", value=initial_support_content, help="例：体調確認、医療機関の受診を勧めた。", key="support_content")
+            st.write("---")
+            st.write("##### 援助内容")
+            
+            # 新しい援助内容の詳細項目
+            support_checked_health_confirm = st.checkbox("体調を確認した", value=initial_support_checked_health_confirm, key="support_checked_health_confirm")
+            if support_checked_health_confirm:
+                support_content_health_confirm = st.text_area("内容（体調確認）", value=initial_support_content_health_confirm, key="support_content_health_confirm")
+            else:
+                support_content_health_confirm = ""
+
+            support_checked_medical_recommend = st.checkbox("医療機関の受診を勧めた", value=initial_support_checked_medical_recommend, key="support_checked_medical_recommend")
+            if support_checked_medical_recommend:
+                support_content_medical_recommend = st.text_input("内容（医療機関の受診）", value=initial_support_content_medical_recommend, key="support_content_medical_recommend")
+            else:
+                support_content_medical_recommend = ""
+
+            support_checked_next_visit = st.checkbox("次回利用日を確認した", value=initial_support_checked_next_visit, key="support_checked_next_visit")
+            if support_checked_next_visit:
+                # Use current_jst_date as a fallback for initial_support_date_next_visit if None
+                default_next_visit_date = initial_support_date_next_visit if initial_support_date_next_visit else current_jst_date
+                support_date_next_visit = st.date_input("日付（次回利用日）", value=default_next_visit_date, key="support_date_next_visit")
+            else:
+                support_date_next_visit = None # If checkbox is off, clear the date
+
+            support_checked_other = st.checkbox("その他（援助内容）", value=initial_support_checked_other, key="support_checked_other")
+            if support_checked_other:
+                support_content_other = st.text_area("内容（その他援助）", value=initial_support_content_other, key="support_content_other")
+            else:
+                support_content_other = ""
+            
+            # 元々の援助内容フィールドも残しておく (必要に応じて削除してください)
+            support_content = st.text_area("援助内容（詳細を記入 - 旧フィールド）", value=initial_support_content, help="例：体調確認、医療機関の受診を勧めた。", key="support_content_old")
+
 
             submitted = st.form_submit_button("欠席情報を登録/更新")
             if submitted:
                 conn = get_db_connection()
                 
+                # Convert datetime.date objects to string for database storage
+                support_date_next_visit_str = support_date_next_visit.strftime('%Y-%m-%d') if support_date_next_visit else None
+
                 # Check if an existing record needs to be updated or a new one inserted
                 if existing_absence_data:
                     conn.execute('''
@@ -901,7 +958,11 @@ def show_absence_page():
                             reason_other_than_self_illness=?, reason_family_convenience=?, 
                             reason_family_illness=?, reason_family_illness_who=?, 
                             reason_regular_checkup=?, reason_checkup_place=?, 
-                            reason_other_text=?, support_content=?
+                            reason_other_text=?, support_content=?, -- Original support content
+                            support_checked_health_confirm=?, support_content_health_confirm=?,
+                            support_checked_medical_recommend=?, support_content_medical_recommend=?,
+                            support_checked_next_visit=?, support_date_next_visit=?,
+                            support_checked_other=?, support_content_other=?
                         WHERE id = ?
                     ''', (reception_date, reception_staff_id, contact_person, 
                           absence_start_date, absence_end_date, 
@@ -911,7 +972,12 @@ def show_absence_page():
                           reason_other_than_self_illness, reason_family_convenience,
                           reason_family_illness, reason_family_illness_who,
                           reason_regular_checkup, reason_checkup_place,
-                          reason_other_text, support_content, existing_absence_data['id']))
+                          reason_other_text, support_content, # Original support content
+                          support_checked_health_confirm, support_content_health_confirm,
+                          support_checked_medical_recommend, support_content_medical_recommend,
+                          support_checked_next_visit, support_date_next_visit_str, # Store date as string
+                          support_checked_other, support_content_other,
+                          existing_absence_data['id']))
                     st.success("欠席情報を更新しました。")
                 else:
                     conn.execute('''
@@ -923,8 +989,12 @@ def show_absence_page():
                                             reason_other_than_self_illness, reason_family_convenience, 
                                             reason_family_illness, reason_family_illness_who, 
                                             reason_regular_checkup, reason_checkup_place, 
-                                            reason_other_text, support_content)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                            reason_other_text, support_content, -- Original support content
+                                            support_checked_health_confirm, support_content_health_confirm,
+                                            support_checked_medical_recommend, support_content_medical_recommend,
+                                            support_checked_next_visit, support_date_next_visit,
+                                            support_checked_other, support_content_other)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (selected_user_id, reception_date, reception_staff_id, contact_person, 
                           absence_start_date, absence_end_date, 
                           reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
@@ -933,7 +1003,11 @@ def show_absence_page():
                           reason_other_than_self_illness, reason_family_convenience,
                           reason_family_illness, reason_family_illness_who,
                           reason_regular_checkup, reason_checkup_place,
-                          reason_other_text, support_content))
+                          reason_other_text, support_content, # Original support content
+                          support_checked_health_confirm, support_content_health_confirm,
+                          support_checked_medical_recommend, support_content_medical_recommend,
+                          support_checked_next_visit, support_date_next_visit_str, # Store date as string
+                          support_checked_other, support_content_other))
                     st.success("欠席情報を登録しました。")
                 conn.commit()
                 conn.close()
