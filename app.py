@@ -735,71 +735,78 @@ def show_absence_page():
     st.header("欠席入力")
 
     users = get_user_list()
-    user_options = {user['id']: user['name'] for user in users}
+    user_options_dict = {user['id']: user['name'] for user in users}
+    
+    # Options for the selectbox, including a "選択してください" option
+    # The actual values corresponding to these options
+    selectable_user_options_for_selectbox = [("選択してください", None)] + [(user_options_dict[uid], uid) for uid in user_options_dict]
+    
+    # Extract just the display names for the Streamlit selectbox options parameter
+    display_user_names = [option[0] for option in selectable_user_options_for_selectbox]
     
     staff = get_staff_list()
-    # Create staff_options including a "選択してください" for None
     staff_options_with_none = {None: "選択してください"}
     staff_options_with_none.update({s['id']: s['name'] for s in staff})
 
-    # Get current date in JST
     current_jst_date = datetime.now(JST).date()
 
-    # Pre-select user if coming from log list
     initial_user_id = st.session_state.get('selected_user_id_for_absence', None)
     initial_log_date = st.session_state.get('selected_log_date', current_jst_date)
 
-    # Safely determine the index for the user selectbox
-    selected_user_index = None
-    if initial_user_id is not None and initial_user_id in user_options:
+    # Safely determine the initial index for the user selectbox
+    selected_user_initial_index = 0 # Default to "選択してください"
+    if initial_user_id is not None:
         try:
-            selected_user_index = list(user_options.keys()).index(initial_user_id)
+            # Find the index of the initial_user_id within the `selectable_user_options_for_selectbox` tuples
+            for i, (name, uid) in enumerate(selectable_user_options_for_selectbox):
+                if uid == initial_user_id:
+                    selected_user_initial_index = i
+                    break
         except ValueError:
-            pass # index remains None
+            pass # Keep default index 0 if not found
 
-    selected_user_id = st.selectbox(
+    selected_user_display_name = st.selectbox(
         "欠席者を選択",
-        options=list(user_options.keys()),
-        format_func=lambda x: user_options.get(x),
-        index=selected_user_index,
-        key="absence_user_select" # Add unique key
+        options=display_user_names,
+        index=selected_user_initial_index,
+        key="absence_user_select"
     )
+    
+    # Get the actual selected user ID based on the display name chosen by the user
+    # This correctly maps "選択してください" back to None, or a user name to their ID.
+    selected_user_id = selectable_user_options_for_selectbox[display_user_names.index(selected_user_display_name)][1]
 
-    if selected_user_id:
-        # Load existing absence data if available for the selected user and initial log date
-        # This part assumes you want to load data for the _initial_ selected date,
-        # or the most recent absence for the user if no specific date is implied.
-        # For simplicity, let's try to load based on user_id and initial_log_date.
-        # In a real app, you might want a dropdown to select previous absence records.
-        conn = get_db_connection()
-        existing_absence = conn.execute(
-            'SELECT * FROM absences WHERE user_id = ? AND reception_date = ? ORDER BY id DESC LIMIT 1',
-            (selected_user_id, initial_log_date.strftime('%Y-%m-%d'))
-        ).fetchone()
-        conn.close()
+    with st.form("absence_form"):
+        if selected_user_id is None: # If "選択してください" is selected
+            st.info("欠席者を選択してください。")
+            submitted = st.form_submit_button("欠席情報を登録/更新", key="submit_absence_form", disabled=True) # Disable if no user selected
+        else: # A valid user is selected
+            # Load existing absence data if available for the selected user and initial log date
+            conn = get_db_connection()
+            existing_absence = conn.execute(
+                'SELECT * FROM absences WHERE user_id = ? AND reception_date = ? ORDER BY id DESC LIMIT 1',
+                (selected_user_id, initial_log_date.strftime('%Y-%m-%d'))
+            ).fetchone()
+            conn.close()
 
-        initial_reception_staff_id = existing_absence['reception_staff_id'] if existing_absence else None
-        initial_reception_date = datetime.strptime(existing_absence['reception_date'], '%Y-%m-%d').date() if existing_absence and existing_absence['reception_date'] else initial_log_date
-        initial_contact_person = existing_absence['contact_person'] if existing_absence else ""
-        initial_absence_start_date = datetime.strptime(existing_absence['absence_start_date'], '%Y-%m-%d').date() if existing_absence and existing_absence['absence_start_date'] else initial_log_date
-        initial_absence_end_date = datetime.strptime(existing_absence['absence_end_date'], '%Y-%m-%d').date() if existing_absence and existing_absence['absence_end_date'] else initial_log_date
-        
-        initial_reason_type = existing_absence['reason_type'] if existing_absence else "本人体調不良"
-        initial_reason_details = json.loads(existing_absence['reason_details']) if existing_absence and existing_absence['reason_details'] else {}
-        initial_support_content = json.loads(existing_absence['support_content']) if existing_absence and existing_absence['support_content'] else {}
+            initial_reception_staff_id = existing_absence['reception_staff_id'] if existing_absence else None
+            initial_reception_date = datetime.strptime(existing_absence['reception_date'], '%Y-%m-%d').date() if existing_absence and existing_absence['reception_date'] else initial_log_date
+            initial_contact_person = existing_absence['contact_person'] if existing_absence else ""
+            initial_absence_start_date = datetime.strptime(existing_absence['absence_start_date'], '%Y-%m-%d').date() if existing_absence and existing_absence['absence_start_date'] else initial_log_date
+            initial_absence_end_date = datetime.strptime(existing_absence['absence_end_date'], '%Y-%m-%d').date() if existing_absence and existing_absence['absence_end_date'] else initial_log_date
+            
+            initial_reason_type = existing_absence['reason_type'] if existing_absence else "本人体調不良"
+            initial_reason_details = json.loads(existing_absence['reason_details']) if existing_absence and existing_absence['reason_details'] else {}
+            initial_support_content = json.loads(existing_absence['support_content']) if existing_absence and existing_absence['support_content'] else {}
 
-
-        with st.form("absence_form"): # This is the form context
-            st.write(f"##### {user_options[selected_user_id]}さんの欠席情報")
+            st.write(f"##### {user_options_dict[selected_user_id]}さんの欠席情報")
             c1, c2 = st.columns(2)
             
-            # Determine the index for the reception staff selectbox
-            reception_staff_selected_index = 0 # Default to "選択してください" (which is at index 0 after adding None)
+            reception_staff_selected_index = 0
             if initial_reception_staff_id is not None:
                 try:
                     reception_staff_selected_index = list(staff_options_with_none.keys()).index(initial_reception_staff_id)
                 except ValueError:
-                    # If initial_reception_staff_id is not found in the list, keep default index 0
                     pass
 
             reception_staff_id = c1.selectbox(
@@ -807,15 +814,15 @@ def show_absence_page():
                 options=list(staff_options_with_none.keys()), 
                 format_func=lambda x: staff_options_with_none.get(x), 
                 index=reception_staff_selected_index,
-                key="reception_staff_selectbox_absence" # Unique key
+                key="reception_staff_selectbox_absence"
             )
-            reception_date = c2.date_input("受付日", initial_reception_date, key="reception_date_absence") # Unique key
+            reception_date = c2.date_input("受付日", initial_reception_date, key="reception_date_absence")
 
-            contact_person = st.text_input("欠席の連絡者", value=initial_contact_person, key="contact_person_absence") # Unique key
+            contact_person = st.text_input("欠席の連絡者", value=initial_contact_person, key="contact_person_absence")
             
             c1, c2 = st.columns(2)
-            absence_start_date = c1.date_input("欠席期間（開始）", initial_absence_start_date, key="absence_start_date_absence") # Unique key
-            absence_end_date = c2.date_input("欠席期間（終了）", initial_absence_end_date, key="absence_end_date_absence") # Unique key
+            absence_start_date = c1.date_input("欠席期間（開始）", initial_absence_start_date, key="absence_start_date_absence")
+            absence_end_date = c2.date_input("欠席期間（終了）", initial_absence_end_date, key="absence_end_date_absence")
             
             st.write("---")
             st.write("##### 欠席理由")
@@ -823,90 +830,83 @@ def show_absence_page():
                 "欠席理由の分類",
                 ("本人の体調不良", "本人の体調不良以外"),
                 index=("本人の体調不良", "本人の体調不良以外").index(initial_reason_type),
-                key="reason_type_absence" # Unique key
+                key="reason_type_absence"
             )
 
-            reason_details = {} # This will store the structured reason details
+            reason_details = {}
 
             if reason_type == "本人の体調不良":
                 st.write("###### 体調不良の詳細")
                 col_sick1, col_sick2, col_sick3, col_sick4 = st.columns(4)
                 with col_sick1:
-                    reason_details['発作'] = st.checkbox("発作", value=initial_reason_details.get('発作', False), key="sick_hassaku_absence") # Unique key
-                    reason_details['発熱'] = st.checkbox("発熱", value=initial_reason_details.get('発熱', False), key="sick_hatsunetsu_absence") # Unique key
+                    reason_details['発作'] = st.checkbox("発作", value=initial_reason_details.get('発作', False), key="sick_hassaku_absence")
+                    reason_details['発熱'] = st.checkbox("発熱", value=initial_reason_details.get('発熱', False), key="sick_hatsunetsu_absence")
                 with col_sick2:
-                    reason_details['嘔吐'] = st.checkbox("嘔吐", value=initial_reason_details.get('嘔吐', False), key="sick_outo_absence") # Unique key
-                    reason_details['咳'] = st.checkbox("咳", value=initial_reason_details.get('咳', False), key="sick_seki_absence") # Unique key
+                    reason_details['嘔吐'] = st.checkbox("嘔吐", value=initial_reason_details.get('嘔吐', False), key="sick_outo_absence")
+                    reason_details['咳'] = st.checkbox("咳", value=initial_reason_details.get('咳', False), key="sick_seki_absence")
                 with col_sick3:
-                    reason_details['鼻水'] = st.checkbox("鼻水", value=initial_reason_details.get('鼻水', False), key="sick_hanamizu_absence") # Unique key
-                    reason_details['下痢'] = st.checkbox("下痢", value=initial_reason_details.get('下痢', False), key="sick_geri_absence") # Unique key
+                    reason_details['鼻水'] = st.checkbox("鼻水", value=initial_reason_details.get('鼻水', False), key="sick_hanamizu_absence")
+                    reason_details['下痢'] = st.checkbox("下痢", value=initial_reason_details.get('下痢', False), key="sick_geri_absence")
                 with col_sick4:
-                    reason_details['機嫌不良'] = st.checkbox("機嫌不良", value=initial_reason_details.get('機嫌不良', False), key="sick_kigenfuryo_absence") # Unique key
-                    reason_details['発疹'] = st.checkbox("発疹", value=initial_reason_details.get('発疹', False), key="sick_hasshin_absence") # Unique key
-                reason_details['その他_本人体調不良'] = st.text_area("その他（本人の体調不良）", value=initial_reason_details.get('その他_本人体調不良', ""), key="sick_other_absence") # Unique key
+                    reason_details['機嫌不良'] = st.checkbox("機嫌不良", value=initial_reason_details.get('機嫌不良', False), key="sick_kigenfuryo_absence")
+                    reason_details['発疹'] = st.checkbox("発疹", value=initial_reason_details.get('発疹', False), key="sick_hasshin_absence")
+                reason_details['その他_本人体調不良'] = st.text_area("その他（本人の体調不良）", value=initial_reason_details.get('その他_本人体調不良', ""), key="sick_other_absence")
             else: # 本人の体調不良以外
                 st.write("###### 体調不良以外の理由の詳細")
-                reason_details['家族の都合'] = st.checkbox("家族の都合", value=initial_reason_details.get('家族の都合', False), key="reason_kazoku_tsugou_absence") # Unique key
-                reason_details['家族の体調不良'] = st.checkbox("家族の体調不良", value=initial_reason_details.get('家族の体調不良', False), key="reason_kazoku_taichofuryo_absence") # Unique key
+                reason_details['家族の都合'] = st.checkbox("家族の都合", value=initial_reason_details.get('家族の都合', False), key="reason_kazoku_tsugou_absence")
+                reason_details['家族の体調不良'] = st.checkbox("家族の体調不良", value=initial_reason_details.get('家族の体調不良', False), key="reason_kazoku_taichofuryo_absence")
                 if reason_details['家族の体調不良']:
-                    reason_details['家族の体調不良_誰が'] = st.text_input("誰が？", value=initial_reason_details.get('家族の体調不良_誰が', ""), key="reason_kazoku_taichofuryo_darega_absence") # Unique key
+                    reason_details['家族の体調不良_誰が'] = st.text_input("誰が？", value=initial_reason_details.get('家族の体調不良_誰が', ""), key="reason_kazoku_taichofuryo_darega_absence")
                 
-                reason_details['定期受診'] = st.checkbox("定期受診", value=initial_reason_details.get('定期受診', False), key="reason_teikijushin_absence") # Unique key
+                reason_details['定期受診'] = st.checkbox("定期受診", value=initial_reason_details.get('定期受診', False), key="reason_teikijushin_absence")
                 if reason_details['定期受診']:
-                    reason_details['定期受診_受診先'] = st.text_input("受診先", value=initial_reason_details.get('定期受診_受診先', ""), key="reason_teikijushin_jushinsaki_absence") # Unique key
+                    reason_details['定期受診_受診先'] = st.text_input("受診先", value=initial_reason_details.get('定期受診_受診先', ""), key="reason_teikijushin_jushinsaki_absence")
                 
-                reason_details['その他_本人体調不良以外'] = st.text_area("その他（本人の体調不良以外）", value=initial_reason_details.get('その他_本人体調不良以外', ""), key="reason_other_else_absence") # Unique key
+                reason_details['その他_本人体調不良以外'] = st.text_area("その他（本人の体調不良以外）", value=initial_reason_details.get('その他_本人体調不良以外', ""), key="reason_other_else_absence")
 
             st.write("---")
             st.write("##### 援助内容")
-            support_content = {} # This will store the structured support content
+            support_content = {}
 
-            support_content['体調を確認した'] = st.checkbox("体調を確認した", value=initial_support_content.get('体調を確認した', False), key="support_taichoukakunin_absence") # Unique key
+            support_content['体調を確認した'] = st.checkbox("体調を確認した", value=initial_support_content.get('体調を確認した', False), key="support_taichoukakunin_absence")
             if support_content['体調を確認した']:
-                support_content['体調を確認した_内容'] = st.text_area("内容（体調確認）", value=initial_support_content.get('体調を確認した_内容', ""), key="support_taichoukakunin_naiyou_absence") # Unique key
+                support_content['体調を確認した_内容'] = st.text_area("内容（体調確認）", value=initial_support_content.get('体調を確認した_内容', ""), key="support_taichoukakunin_naiyou_absence")
             
-            support_content['医療機関の受診を勧めた'] = st.checkbox("医療機関の受診を勧めた", value=initial_support_content.get('医療機関の受診を勧めた', False), key="support_iryokikan_absence") # Unique key
+            support_content['医療機関の受診を勧めた'] = st.checkbox("医療機関の受診を勧めた", value=initial_support_content.get('医療機関の受診を勧めた', False), key="support_iryokikan_absence")
             if support_content['医療機関の受診を勧めた']:
-                support_content['医療機関の受診を勧めた_内容'] = st.text_input("内容（受診勧告）", value=initial_support_content.get('医療機関の受診を勧めた_内容', ""), key="support_iryokikan_naiyou_absence") # Unique key
+                support_content['医療機関の受診を勧めた_内容'] = st.text_input("内容（受診勧告）", value=initial_support_content.get('医療機関の受診を勧めた_内容', ""), key="support_iryokikan_naiyou_absence")
             
-            support_content['次回利用日を確認した'] = st.checkbox("次回利用日を確認した", value=initial_support_content.get('次回利用日を確認した', False), key="support_jikairiyoubi_absence") # Unique key
+            support_content['次回利用日を確認した'] = st.checkbox("次回利用日を確認した", value=initial_support_content.get('次回利用日を確認した', False), key="support_jikairiyoubi_absence")
             if support_content['次回利用日を確認した']:
-                # Handle initial_support_content.get('次回利用日を確認した_日付') which might be string or None
                 initial_next_use_date = None
                 if '次回利用日を確認した_日付' in initial_support_content and initial_support_content['次回利用日を確認した_日付']:
                     try:
                         initial_next_use_date = datetime.strptime(initial_support_content['次回利用日を確認した_日付'], '%Y-%m-%d').date()
                     except ValueError:
-                        pass # Keep None if parsing fails or data is bad
+                        pass
                 
-                support_content['次回利用日を確認した_日付'] = st.date_input("日付", value=initial_next_use_date or current_jst_date, key="support_jikairiyoubi_date_absence") # Unique key
+                support_content['次回利用日を確認した_日付'] = st.date_input("日付", value=initial_next_use_date or current_jst_date, key="support_jikairiyoubi_date_absence")
             
-            support_content['その他_援助内容'] = st.checkbox("その他（援助内容）", value=initial_support_content.get('その他_援助内容', False), key="support_other_absence") # Unique key
+            support_content['その他_援助内容'] = st.checkbox("その他（援助内容）", value=initial_support_content.get('その他_援助内容', False), key="support_other_absence")
             if support_content['その他_援助内容']:
-                support_content['その他_援助内容_内容'] = st.text_area("内容（その他援助）", value=initial_support_content.get('その他_援助内容_内容', ""), key="support_other_naiyou_absence") # Unique key
+                support_content['その他_援助内容_内容'] = st.text_area("内容（その他援助）", value=initial_support_content.get('その他_援助内容_内容', ""), key="support_other_naiyou_absence")
 
-            # Moving the submit button to the very end of the form block
-            submitted = st.form_submit_button("欠席情報を登録/更新", key="submit_absence_form") # Unique key for the submit button
+            submitted = st.form_submit_button("欠席情報を登録/更新", key="submit_absence_form") # Submit button for the form
             
             if submitted:
-                # データベースへの保存処理
                 conn = get_db_connection()
                 
-                # Convert date objects to string for database storage
                 absence_start_date_str = absence_start_date.strftime('%Y-%m-%d')
                 absence_end_date_str = absence_end_date.strftime('%Y-%m-%d')
                 reception_date_str = reception_date.strftime('%Y-%m-%d')
 
-                # Handle date object in support_content before saving as JSON
                 if '次回利用日を確認した_日付' in support_content and isinstance(support_content['次回利用日を確認した_日付'], datetime.date):
                     support_content['次回利用日を確認した_日付'] = support_content['次回利用日を確認した_日付'].strftime('%Y-%m-%d')
 
-                # Serialize dictionaries to JSON strings for storage
                 reason_details_json = json.dumps(reason_details, ensure_ascii=False)
                 support_content_json = json.dumps(support_content, ensure_ascii=False)
 
                 if existing_absence:
-                    # Update existing record
                     conn.execute('''
                         UPDATE absences
                         SET reception_date=?, reception_staff_id=?, contact_person=?, 
@@ -918,7 +918,6 @@ def show_absence_page():
                           reason_details_json, support_content_json, existing_absence['id']))
                     st.success("欠席情報を更新しました。")
                 else:
-                    # Insert new record
                     conn.execute('''
                         INSERT INTO absences (user_id, reception_date, reception_staff_id, contact_person, absence_start_date, absence_end_date, reason_type, reason_details, support_content)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
