@@ -83,7 +83,7 @@ def create_tables():
             FOREIGN KEY (oral_care_staff_id) REFERENCES staff (id)
         )
     ''')
-    
+
     # 排泄記録テーブル
     c.execute('''
         CREATE TABLE IF NOT EXISTS excretions (
@@ -99,10 +99,10 @@ def create_tables():
             FOREIGN KEY (staff2_id) REFERENCES staff (id)
         )
     ''')
-    
+
     # 欠席記録テーブル（仕様が複雑なため主要項目のみ実装）
     # Alter table to add new columns for detailed absence reasons if they don't exist
-    
+
     # Check if columns exist and add them if not. This handles existing databases.
     # For a fresh run, it will create the table and these columns won't be added immediately
     # but the subsequent ALTER TABLE statements will ensure they are there.
@@ -192,7 +192,7 @@ def get_or_create_log_id(user_id, log_date):
     c = conn.cursor()
     # Ensure log_date is in 'YYYY-MM-DD' format for database query
     log_date_str = log_date.strftime('%Y-%m-%d') if isinstance(log_date, datetime) or isinstance(log_date, pd.Timestamp) else log_date
-    
+
     c.execute('SELECT id FROM daily_logs WHERE user_id = ? AND log_date = ?', (user_id, log_date_str))
     log = c.fetchone()
     if log:
@@ -236,18 +236,18 @@ def show_user_info_page():
     st.header("利用者情報登録")
 
     days_of_week = ["月", "火", "水", "木", "金", "土", "日"]
-    
+
     # 既存利用者選択ロジック
     users = get_user_list()
     user_options = {"新規利用者登録": None}
     user_options.update({user['name']: user['id'] for user in users})
-    
+
     selected_user_name = st.selectbox(
         "利用者を選択（新規登録または既存の利用者情報を編集）",
         options=list(user_options.keys()),
         index=0 # Default to "新規利用者登録"
     )
-    
+
     selected_user_id_for_edit = user_options[selected_user_name]
     current_user_data = None
     if selected_user_id_for_edit:
@@ -263,7 +263,7 @@ def show_user_info_page():
     initial_is_active = current_user_data['is_active'] if current_user_data else True
     initial_start_date = datetime.strptime(current_user_data['start_date'], '%Y-%m-%d').date() if current_user_data and current_user_data['start_date'] else None
     initial_end_date = datetime.strptime(current_user_data['end_date'], '%Y-%m-%d').date() if current_user_data and current_user_data['end_date'] else None
-    
+
     initial_use_days_list = current_user_data['use_days'].split(',') if current_user_data and current_user_data['use_days'] else []
     initial_medication_days_list = current_user_data['medication_days'].split(',') if current_user_data and current_user_data['medication_days'] else []
     initial_bath_days_list = current_user_data['bath_days'].split(',') if current_user_data and current_user_data['bath_days'] else []
@@ -271,21 +271,21 @@ def show_user_info_page():
 
     with st.form("user_info_form"):
         st.write("##### 利用者情報を入力してください")
-        
+
         c1, c2 = st.columns(2)
         # 既存利用者編集時は利用者コードを読み取り専用にするか、非表示にする
         user_code = c1.number_input("利用者コード", step=1, format="%d", value=initial_user_code, disabled=(selected_user_id_for_edit is not None), key="user_code_input")
         name = c2.text_input("氏名 *", value=initial_name)
         kana = c1.text_input("フリガナ", value=initial_kana)
-        
+
         # 生年月日の入力可能範囲を制限なしにする (1900年1月1日から現在まで)
         birthday = c2.date_input(
-            "生年月日", 
-            value=initial_birthday, 
+            "生年月日",
+            value=initial_birthday,
             min_value=datetime(1900, 1, 1).date(), # 1900年1月1日を最小値に設定
             max_value=datetime.now(JST).date() # 現在の日付を最大値に設定
         )
-        
+
         gender = c1.selectbox("性別", ["男", "女", "その他"], index=["男", "女", "その他"].index(initial_gender) if initial_gender else None)
         patient_category = c2.selectbox("患者区分", ["たんぽぽ", "ゆり", "さくら", "すみれ", "なのはな", "療護", "外来"], index=["たんぽぽ", "ゆり", "さくら", "すみれ", "なのはな", "療護", "外来"].index(initial_patient_category) if initial_patient_category else None)
 
@@ -293,7 +293,7 @@ def show_user_info_page():
         c1, c2 = st.columns(2)
         start_date = c1.date_input("利用開始日", value=initial_start_date)
         end_date = c2.date_input("退所年月日", value=initial_end_date)
-        
+
         st.write("---")
         st.write("##### 利用曜日")
         use_days_cols = st.columns(7)
@@ -312,7 +312,7 @@ def show_user_info_page():
                 # If a checkbox is disabled, its value will be False by default if not explicitly set
                 if st.checkbox(day, value=(day in initial_medication_days_list), key=f"medication_{day}_user_info", disabled=disabled_med_day):
                     medication_days_selected.append(day)
-        
+
         st.write("---")
         st.write("##### 入浴曜日")
         bath_days_cols = st.columns(7)
@@ -323,14 +323,14 @@ def show_user_info_page():
                 # If a checkbox is disabled, its value will be False by default if not explicitly set
                 if st.checkbox(day, value=(day in initial_bath_days_list), key=f"bath_{day}_user_info", disabled=disabled_bath_day):
                     bath_days_selected.append(day)
-        
+
         c_submit1, c_submit2 = st.columns(2)
 
         if selected_user_id_for_edit is None: # 新規登録モード
             submitted = c_submit1.form_submit_button("新規登録する")
         else: # 更新モード
             submitted = c_submit1.form_submit_button("更新する")
-            
+
         if submitted:
             if not name:
                 st.error("氏名は必須です。")
@@ -338,7 +338,7 @@ def show_user_info_page():
                 use_days_str = ",".join([day for day, selected in use_days_checkbox_states.items() if selected])
                 medication_days_str = ",".join(medication_days_selected)
                 bath_days_str = ",".join(bath_days_selected)
-                
+
                 conn = get_db_connection()
                 try:
                     if selected_user_id_for_edit is None: # 新規登録
@@ -349,7 +349,7 @@ def show_user_info_page():
                         st.success(f"{name}さんの情報を登録しました。")
                     else: # 更新
                         conn.execute('''
-                            UPDATE users 
+                            UPDATE users
                             SET name=?, kana=?, birthday=?, gender=?, patient_category=?, is_active=?, start_date=?, end_date=?, use_days=?, medication_days=?, bath_days=?
                             WHERE id=?
                         ''', (name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days_str, medication_days_str, bath_days_str, selected_user_id_for_edit))
@@ -366,7 +366,7 @@ def show_user_info_page():
 def show_log_list_page():
     """日誌一覧ページ"""
     st.header("日誌一覧")
-    
+
     # Get current date in JST
     current_jst_date = datetime.now(JST).date()
     log_date = st.date_input("対象日を選択", current_jst_date)
@@ -379,14 +379,14 @@ def show_log_list_page():
     query = f"SELECT id, name FROM users WHERE is_active = 1 AND use_days LIKE '%{selected_weekday}%' ORDER BY kana"
     today_users = conn.execute(query).fetchall()
     conn.close()
-    
+
     st.write("---")
-    
+
     if not today_users:
         st.warning("本日の利用予定者はいません。")
     else:
         st.write(f"##### {len(today_users)}名の利用予定者")
-        
+
         # Create columns for display and buttons
         cols = st.columns([0.5, 0.2, 0.1, 0.1, 0.1])
         with cols[0]:
@@ -397,33 +397,33 @@ def show_log_list_page():
             st.write("**排泄**")
         with cols[3]:
             st.write("**欠席**")
-        
+
         for user in today_users:
             user_id = user["id"]
             user_name = user["name"]
-            
+
             # Use separate columns for each row's elements
             col_name, col_log, col_excretion, col_absence = st.columns([0.5, 0.2, 0.1, 0.1])
-            
+
             with col_name:
                 st.write(user_name)
-            
+
             # Daily Log button
             with col_log:
                 if st.button("✏️", key=f"log_{user_id}"):
                     st.session_state.page = "日誌入力"
                     st.session_state.selected_user_id_for_log = user_id
                     st.session_state.selected_log_date = log_date
-                    st.rerun() 
-            
+                    st.rerun()
+
             # Excretion button
             with col_excretion:
                 if st.button("🚽", key=f"excretion_{user_id}"):
                     st.session_state.page = "排泄入力"
                     st.session_state.selected_user_id_for_excretion = user_id
                     st.session_state.selected_log_date = log_date
-                    st.rerun() 
-                    
+                    st.rerun()
+
             # Absence button
             with col_absence:
                 if st.button("❌", key=f"absence_{user_id}"):
@@ -436,7 +436,7 @@ def show_log_list_page():
     with st.expander("臨時利用者の追加"):
         users = get_user_list()
         user_options = {user['id']: user['name'] for user in users}
-        
+
         selected_user_id_temp = st.selectbox(
             "臨時で利用する利用者を選択",
             options=list(user_options.keys()),
@@ -457,10 +457,10 @@ def show_log_input_page():
 
     users = get_user_list()
     user_options = {user['id']: user['name'] for user in users}
-    
+
     staff = get_staff_list()
     staff_options = {s['id']: s['name'] for s in staff}
-    
+
     # Get current date in JST
     current_jst_date = datetime.now(JST).date()
 
@@ -488,19 +488,19 @@ def show_log_input_page():
 
     if selected_user_id and log_date:
         st.subheader(f"{user_options[selected_user_id]}さんの日誌 ({log_date.strftime('%Y/%m/%d')})")
-        
+
         log_id = get_or_create_log_id(selected_user_id, log_date)
-        
+
         # 既存データを読み込む
         conn = get_db_connection()
         log_data = conn.execute('SELECT * FROM daily_logs WHERE id = ?', (log_id,)).fetchone()
-        
+
         # 利用者情報を取得して利用曜日を確認
         user_info = get_user_by_id(selected_user_id)
         user_use_days_list = user_info['use_days'].split(',') if user_info and user_info['use_days'] else []
         weekday_map_full = {0: "月", 1: "火", 2: "水", 3: "木", 4: "金", 5: "土", 6: "日"}
         selected_weekday = weekday_map_full[log_date.weekday()]
-        
+
         # 臨時利用者（利用曜日ではない日に利用）の判定
         is_temporary_user_for_log_date = selected_weekday not in user_use_days_list
 
@@ -509,50 +509,50 @@ def show_log_input_page():
         with st.form("log_input_form"):
             # Populate form with existing data, handling None values
             is_absent = log_data['is_absent'] if log_data and log_data['is_absent'] is not None else False
-            st.checkbox("欠席", value=is_absent) 
+            st.checkbox("欠席", value=is_absent)
 
             st.write("---")
             st.write("##### バイタル")
             c1, c2, c3, c4, c5 = st.columns(5)
-            temperature = c1.number_input("体温", min_value=30.0, max_value=45.0, step=0.1, format="%.1f", 
+            temperature = c1.number_input("体温", min_value=30.0, max_value=45.0, step=0.1, format="%.1f",
                                 value=log_data['temperature'] if log_data and log_data['temperature'] is not None else 36.5)
-            pulse = c2.number_input("脈", min_value=0, max_value=200, step=1, 
+            pulse = c2.number_input("脈", min_value=0, max_value=200, step=1,
                                 value=log_data['pulse'] if log_data and log_data['pulse'] is not None else 70)
-            spo2 = c3.number_input("SPO2", min_value=0, max_value=100, step=1, 
+            spo2 = c3.number_input("SPO2", min_value=0, max_value=100, step=1,
                                 value=log_data['spo2'] if log_data and log_data['spo2'] is not None else 98)
-            bp_high = c4.number_input("最高血圧", min_value=0, max_value=300, step=1, 
+            bp_high = c4.number_input("最高血圧", min_value=0, max_value=300, step=1,
                                 value=log_data['bp_high'] if log_data and log_data['bp_high'] is not None else 120)
-            bp_low = c5.number_input("最低血圧", min_value=0, max_value=200, step=1, 
+            bp_low = c5.number_input("最低血圧", min_value=0, max_value=200, step=1,
                                 value=log_data['bp_low'] if log_data and log_data['bp_low'] is not None else 80)
-            weight = c1.number_input("体重", min_value=0.0, max_value=200.0, step=0.1, format="%.1f", 
+            weight = c1.number_input("体重", min_value=0.0, max_value=200.0, step=0.1, format="%.1f",
                                 value=log_data['weight'] if log_data and log_data['weight'] is not None else 50.0)
 
             st.write("---")
             st.write("##### 内服・口腔ケア")
             c1, c2 = st.columns(2)
             medication_check = c1.checkbox("内服実施", value=log_data['medication_check'] if log_data and log_data['medication_check'] is not None else False)
-            
+
             medication_staff_index = None
             if log_data and log_data['medication_staff_id'] is not None and log_data['medication_staff_id'] in staff_options:
                 try:
                     medication_staff_index = list(staff_options.keys()).index(log_data['medication_staff_id'])
                 except ValueError:
                     pass
-            
+
             # 内服実施が未チェックの場合、または臨時利用者ではない場合のみ disabled
             # つまり、臨時利用者の場合は内服実施が未チェックでも入力可能
             disable_med_staff_input = (not medication_check) and (not is_temporary_user_for_log_date)
             medication_staff_id = c2.selectbox(
-                "内服実施職員", 
-                options=list(staff_options.keys()), 
-                format_func=lambda x: staff_options.get(x), 
+                "内服実施職員",
+                options=list(staff_options.keys()),
+                format_func=lambda x: staff_options.get(x),
                 index=medication_staff_index,
                 disabled=disable_med_staff_input
             )
-            
+
             c1, c2 = st.columns(2)
             oral_care_check = c1.checkbox("口腔ケア実施", value=log_data['oral_care_check'] if log_data and log_data['oral_care_check'] is not None else False)
-            
+
             oral_care_staff_index = None
             if log_data and log_data['oral_care_staff_id'] is not None and log_data['oral_care_staff_id'] in staff_options:
                 try:
@@ -563,9 +563,9 @@ def show_log_input_page():
             # 口腔ケア実施が未チェックの場合、または臨時利用者ではない場合のみ disabled
             disable_oral_staff_input = (not oral_care_check) and (not is_temporary_user_for_log_date)
             oral_care_staff_id = c2.selectbox(
-                "口腔ケア実施職員", 
-                options=list(staff_options.keys()), 
-                format_func=lambda x: staff_options.get(x), 
+                "口腔ケア実施職員",
+                options=list(staff_options.keys()),
+                format_func=lambda x: staff_options.get(x),
                 index=oral_care_staff_index,
                 disabled=disable_oral_staff_input
             )
@@ -574,7 +574,7 @@ def show_log_input_page():
             st.write("##### 入浴")
             bath_check = st.checkbox("入浴実施", value=log_data['bath_check'] if log_data and log_data['bath_check'] is not None else False)
             c1, c2, c3, c4 = st.columns(4)
-            
+
             # Convert stored time string to datetime.time object for time_input
             bath_start_time_val = None
             if log_data and log_data['bath_start_time']:
@@ -598,7 +598,7 @@ def show_log_input_page():
             disable_bath_input = (not bath_check) and (not is_temporary_user_for_log_date)
 
             bath_start_time = c1.time_input("入浴開始時間", value=bath_start_time_val, disabled=disable_bath_input)
-            
+
             bath_start_staff_index = None
             if log_data and log_data['bath_start_staff_id'] is not None and log_data['bath_start_staff_id'] in staff_options:
                 try:
@@ -606,16 +606,16 @@ def show_log_input_page():
                 except ValueError:
                     pass
             bath_start_staff_id = c2.selectbox(
-                "開始記録職員", 
-                options=list(staff_options.keys()), 
-                format_func=lambda x: staff_options.get(x), 
-                index=bath_start_staff_index, 
+                "開始記録職員",
+                options=list(staff_options.keys()),
+                format_func=lambda x: staff_options.get(x),
+                index=bath_start_staff_index,
                 key="bath_start_staff",
                 disabled=disable_bath_input
             )
-            
+
             bath_end_time = c3.time_input("入浴終了時間", value=bath_end_time_val, disabled=disable_bath_input)
-            
+
             bath_end_staff_index = None
             if log_data and log_data['bath_end_staff_id'] is not None and log_data['bath_end_staff_id'] in staff_options:
                 try:
@@ -623,10 +623,10 @@ def show_log_input_page():
                 except ValueError:
                     pass
             bath_end_staff_id = c4.selectbox(
-                "終了記録職員", 
-                options=list(staff_options.keys()), 
-                format_func=lambda x: staff_options.get(x), 
-                index=bath_end_staff_index, 
+                "終了記録職員",
+                options=list(staff_options.keys()),
+                format_func=lambda x: staff_options.get(x),
+                index=bath_end_staff_index,
                 key="bath_end_staff",
                 disabled=disable_bath_input
             )
@@ -641,14 +641,14 @@ def show_log_input_page():
                 conn = get_db_connection()
                 # Use current values from Streamlit widgets, not log_data, as they reflect user input
                 conn.execute('''
-                    UPDATE daily_logs 
-                    SET is_absent=?, temperature=?, pulse=?, spo2=?, bp_high=?, bp_low=?, 
-                        medication_check=?, medication_staff_id=?, bath_check=?, bath_start_time=?, 
-                        bath_start_staff_id=?, bath_end_time=?, bath_end_staff_id=?, oral_care_check=?, 
+                    UPDATE daily_logs
+                    SET is_absent=?, temperature=?, pulse=?, spo2=?, bp_high=?, bp_low=?,
+                        medication_check=?, medication_staff_id=?, bath_check=?, bath_start_time=?,
+                        bath_start_staff_id=?, bath_end_time=?, bath_end_staff_id=?, oral_care_check=?,
                         oral_care_staff_id=?, weight=?, health_notes=?, memo1=?, memo2=?
                     WHERE id = ?
-                ''', (is_absent, temperature, pulse, spo2, bp_high, bp_low, 
-                      medication_check, medication_staff_id, 
+                ''', (is_absent, temperature, pulse, spo2, bp_high, bp_low,
+                      medication_check, medication_staff_id,
                       bath_check, bath_start_time.strftime('%H:%M:%S') if bath_start_time else None, # Store time as string
                       bath_start_staff_id, bath_end_time.strftime('%H:%M:%S') if bath_end_time else None, # Store time as string
                       bath_end_staff_id, oral_care_check,
@@ -662,15 +662,15 @@ def show_log_input_page():
 def show_excretion_page():
     """排泄入力ページ"""
     st.header("排泄入力")
-    
+
     users = get_user_list()
     user_options = {user['id']: user['name'] for user in users}
-    
+
     staff = get_staff_list()
     staff_options = {s['id']: s['name'] for s in staff}
     # Ensure None is a key if it's a possible selection, and handle its index
     if None not in staff_options:
-        staff_options[None] = "なし" 
+        staff_options[None] = "なし"
 
     # Get current date and time in JST
     current_jst_date = datetime.now(JST).date()
@@ -697,24 +697,24 @@ def show_excretion_page():
         index=selected_user_index
     )
     log_date = c2.date_input("利用日", initial_log_date)
-    
+
     if selected_user_id and log_date:
         log_id = get_or_create_log_id(selected_user_id, log_date)
-        
+
         with st.form("excretion_form"):
             st.write(f"##### {user_options[selected_user_id]}さんの排泄記録")
-            
+
             c1, c2 = st.columns(2)
             excretion_time = c1.time_input("排泄時間", value=current_jst_time)
             excretion_type = c2.selectbox("分類", ["尿", "便"], index=None) # Start with no default selection
-            
+
             c1, c2 = st.columns(2)
             # Safely determine index for staff selectboxes
             staff1_index = None
             # No initial value from DB for new excretion record, so index remains None
 
             staff1_id = c1.selectbox("排泄介助職員1", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=staff1_index)
-            
+
             staff2_index = None
             # If the option for 'None' exists and we want it as default, find its index.
             if None in staff_options:
@@ -722,13 +722,13 @@ def show_excretion_page():
                      staff2_index = list(staff_options.keys()).index(None)
                  except ValueError:
                      pass # Should not happen if None is in staff_options
-            
+
             staff2_id = c2.selectbox("排泄介助職員2", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=staff2_index)
-            
+
             notes = st.text_area("特記事項（体調面）")
-            
+
             submitted = st.form_submit_button("記録を追加")
-            
+
             if submitted:
                 if excretion_type and staff1_id:
                     conn = get_db_connection()
@@ -748,7 +748,7 @@ def show_excretion_page():
         st.write("##### 本日の記録一覧")
         conn = get_db_connection()
         records_df = pd.read_sql_query(f'''
-            SELECT 
+            SELECT
                 e.excretion_time AS '時間',
                 e.type AS '分類',
                 s1.name AS '介助職員1',
@@ -769,7 +769,7 @@ def show_absence_page():
 
     users = get_user_list()
     user_options = {user['id']: user['name'] for user in users}
-    
+
     staff = get_staff_list()
     staff_options = {s['id']: s['name'] for s in staff}
 
@@ -809,8 +809,8 @@ def show_absence_page():
         initial_reception_date = existing_absence_data['reception_date'] if existing_absence_data and existing_absence_data['reception_date'] else initial_log_date
         initial_reception_staff_id = existing_absence_data['reception_staff_id'] if existing_absence_data and existing_absence_data['reception_staff_id'] else None
         initial_contact_person = existing_absence_data['contact_person'] if existing_absence_data and existing_absence_data['contact_person'] is not None else ""
-        initial_absence_start_date = existing_absence_data['absence_start_date'] if existing_absence_data and existing_absence_data['absence_start_date'] else initial_log_date
-        initial_absence_end_date = existing_absence_data['absence_end_date'] if existing_absence_data and existing_absence_data['absence_end_date'] else initial_log_date
+        initial_absence_start_date = datetime.strptime(existing_absence_data['absence_start_date'], '%Y-%m-%d').date() if existing_absence_data and existing_absence_data['absence_start_date'] else initial_log_date
+        initial_absence_end_date = datetime.strptime(existing_absence_data['absence_end_date'], '%Y-%m-%d').date() if existing_absence_data and existing_absence_data['absence_end_date'] else initial_log_date
         initial_support_content = existing_absence_data['support_content'] if existing_absence_data and existing_absence_data['support_content'] is not None else "" # Ensure empty string not None for text_area
 
         # Detailed reason initial values (already implemented and displayed always)
@@ -846,7 +846,7 @@ def show_absence_page():
         with st.form("absence_form"):
             st.write(f"##### {user_options[selected_user_id]}さんの欠席情報")
             c1, c2 = st.columns(2)
-            
+
             reception_staff_index = None
             if initial_reception_staff_id is not None and initial_reception_staff_id in staff_options:
                 try:
@@ -858,17 +858,17 @@ def show_absence_page():
             reception_date = c2.date_input("受付日", value=initial_reception_date)
 
             contact_person = st.text_input("欠席の連絡者", value=initial_contact_person)
-            
+
             c1, c2 = st.columns(2)
             absence_start_date = c1.date_input("欠席期間（開始）", value=initial_absence_start_date)
             absence_end_date = c2.date_input("欠席期間（終了）", value=initial_absence_end_date)
-            
+
             st.write("---")
             st.write("##### 欠席理由")
 
             # 本人の体調不良
             reason_self_illness = st.checkbox("本人の体調不良", value=initial_reason_self_illness)
-            
+
             # 常に表示されるサブ項目
             col_b1, col_b2, col_b3, col_b4 = st.columns(4)
             with col_b1:
@@ -888,84 +888,89 @@ def show_absence_page():
 
             # 本人の体調不良以外
             reason_other_than_self_illness = st.checkbox("本人の体調不良以外", value=initial_reason_other_than_self_illness)
-            
+
             # 常に表示されるサブ項目
             reason_family_convenience = st.checkbox("家族の都合", value=initial_reason_family_convenience, key="reason_family_convenience")
             reason_family_illness = st.checkbox("家族の体調不良", value=initial_reason_family_illness, key="reason_family_illness")
-            # 条件付き表示は維持
-            if reason_family_illness:
-                reason_family_illness_who = st.text_input("誰が？", value=initial_reason_family_illness_who, key="reason_family_illness_who")
-            else:
-                reason_family_illness_who = "" # チェックボックスがオフの場合、関連テキストをクリア
+            # 「誰が？」はチェックボックスの状態にかかわらず常に表示
+            reason_family_illness_who = st.text_input("誰が？", value=initial_reason_family_illness_who, key="reason_family_illness_who_input") # Added _input to key to make it unique from variable name
+
             reason_regular_checkup = st.checkbox("定期受診", value=initial_reason_regular_checkup, key="reason_regular_checkup")
-            # 条件付き表示は維持
-            if reason_regular_checkup:
-                reason_checkup_place = st.text_input("受診先", value=initial_reason_checkup_place, key="reason_checkup_place")
-            else:
-                reason_checkup_place = "" # チェックボックスがオフの場合、関連テキストをクリア
+            # 「受診先」はチェックボックスの状態にかかわらず常に表示
+            reason_checkup_place = st.text_input("受診先", value=initial_reason_checkup_place, key="reason_checkup_place_input") # Added _input to key
+
             reason_other_text = st.text_area("その他（本人の体調不良以外）", value=initial_reason_other_text, key="reason_other_text")
 
             st.write("---")
             st.write("##### 援助内容")
-            
+
             # 新しい援助内容の詳細項目
             support_checked_health_confirm = st.checkbox("体調を確認した", value=initial_support_checked_health_confirm, key="support_checked_health_confirm")
-            if support_checked_health_confirm:
-                support_content_health_confirm = st.text_area("内容（体調確認）", value=initial_support_content_health_confirm, key="support_content_health_confirm")
-            else:
-                support_content_health_confirm = ""
+            # 「内容（体調確認）」はチェックボックスの状態にかかわらず常に表示
+            support_content_health_confirm = st.text_area("内容（体調確認）", value=initial_support_content_health_confirm, key="support_content_health_confirm_input") # Added _input to key
 
             support_checked_medical_recommend = st.checkbox("医療機関の受診を勧めた", value=initial_support_checked_medical_recommend, key="support_checked_medical_recommend")
-            if support_checked_medical_recommend:
-                support_content_medical_recommend = st.text_input("内容（医療機関の受診）", value=initial_support_content_medical_recommend, key="support_content_medical_recommend")
-            else:
-                support_content_medical_recommend = ""
+            # 「内容（医療機関の受診）」はチェックボックスの状態にかかわらず常に表示
+            support_content_medical_recommend = st.text_input("内容（医療機関の受診）", value=initial_support_content_medical_recommend, key="support_content_medical_recommend_input") # Added _input to key
 
             support_checked_next_visit = st.checkbox("次回利用日を確認した", value=initial_support_checked_next_visit, key="support_checked_next_visit")
-            if support_checked_next_visit:
-                # Use current_jst_date as a fallback for initial_support_date_next_visit if None
-                default_next_visit_date = initial_support_date_next_visit if initial_support_date_next_visit else current_jst_date
-                support_date_next_visit = st.date_input("日付（次回利用日）", value=default_next_visit_date, key="support_date_next_visit")
-            else:
-                support_date_next_visit = None # If checkbox is off, clear the date
+            # 「日付（次回利用日）」はチェックボックスの状態にかかわらず常に表示
+            # 初期値は既存データ or 現在日付、チェックボックスオフでも表示
+            default_next_visit_date = initial_support_date_next_visit if initial_support_date_next_visit else current_jst_date
+            support_date_next_visit = st.date_input("日付（次回利用日）", value=default_next_visit_date, key="support_date_next_visit_input") # Added _input to key
 
             support_checked_other = st.checkbox("その他（援助内容）", value=initial_support_checked_other, key="support_checked_other")
-            if support_checked_other:
-                support_content_other = st.text_area("内容（その他援助）", value=initial_support_content_other, key="support_content_other")
-            else:
-                support_content_other = ""
-            
+            # 「内容（その他援助）」はチェックボックスの状態にかかわらず常に表示
+            support_content_other = st.text_area("内容（その他援助）", value=initial_support_content_other, key="support_content_other_input") # Added _input to key
+
             # 元々の援助内容フィールドも残しておく (必要に応じて削除してください)
+            # このフィールドも常に表示するように変更
             support_content = st.text_area("援助内容（詳細を記入 - 旧フィールド）", value=initial_support_content, help="例：体調確認、医療機関の受診を勧めた。", key="support_content_old")
 
 
             submitted = st.form_submit_button("欠席情報を登録/更新")
             if submitted:
                 conn = get_db_connection()
-                
+
                 # Convert datetime.date objects to string for database storage
-                support_date_next_visit_str = support_date_next_visit.strftime('%Y-%m-%d') if support_date_next_visit else None
+                # Values are cleared only if the corresponding checkbox is unchecked, regardless of visibility.
+                if not reason_family_illness:
+                    reason_family_illness_who = ""
+                if not reason_regular_checkup:
+                    reason_checkup_place = ""
+                if not support_checked_health_confirm:
+                    support_content_health_confirm = ""
+                if not support_checked_medical_recommend:
+                    support_content_medical_recommend = ""
+
+                support_date_next_visit_str = None
+                if support_checked_next_visit and support_date_next_visit:
+                    support_date_next_visit_str = support_date_next_visit.strftime('%Y-%m-%d')
+
+                if not support_checked_other:
+                    support_content_other = ""
+
 
                 # Check if an existing record needs to be updated or a new one inserted
                 if existing_absence_data:
                     conn.execute('''
-                        UPDATE absences 
-                        SET reception_date=?, reception_staff_id=?, contact_person=?, 
-                            absence_start_date=?, absence_end_date=?, 
-                            reason_self_illness=?, reason_seizure=?, reason_fever=?, reason_vomiting=?, 
-                            reason_cough=?, reason_runny_nose=?, reason_diarrhea=?, reason_mood_bad=?, 
-                            reason_rash=?, reason_self_illness_other_text=?, 
-                            reason_other_than_self_illness=?, reason_family_convenience=?, 
-                            reason_family_illness=?, reason_family_illness_who=?, 
-                            reason_regular_checkup=?, reason_checkup_place=?, 
+                        UPDATE absences
+                        SET reception_date=?, reception_staff_id=?, contact_person=?,
+                            absence_start_date=?, absence_end_date=?,
+                            reason_self_illness=?, reason_seizure=?, reason_fever=?, reason_vomiting=?,
+                            reason_cough=?, reason_runny_nose=?, reason_diarrhea=?, reason_mood_bad=?,
+                            reason_rash=?, reason_self_illness_other_text=?,
+                            reason_other_than_self_illness=?, reason_family_convenience=?,
+                            reason_family_illness=?, reason_family_illness_who=?,
+                            reason_regular_checkup=?, reason_checkup_place=?,
                             reason_other_text=?, support_content=?, -- Original support content
                             support_checked_health_confirm=?, support_content_health_confirm=?,
                             support_checked_medical_recommend=?, support_content_medical_recommend=?,
                             support_checked_next_visit=?, support_date_next_visit=?,
                             support_checked_other=?, support_content_other=?
                         WHERE id = ?
-                    ''', (reception_date, reception_staff_id, contact_person, 
-                          absence_start_date, absence_end_date, 
+                    ''', (reception_date, reception_staff_id, contact_person,
+                          absence_start_date, absence_end_date,
                           reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
                           reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
                           reason_rash, reason_self_illness_other_text,
@@ -981,22 +986,22 @@ def show_absence_page():
                     st.success("欠席情報を更新しました。")
                 else:
                     conn.execute('''
-                        INSERT INTO absences (user_id, reception_date, reception_staff_id, contact_person, 
-                                            absence_start_date, absence_end_date, 
-                                            reason_self_illness, reason_seizure, reason_fever, reason_vomiting, 
-                                            reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad, 
-                                            reason_rash, reason_self_illness_other_text, 
-                                            reason_other_than_self_illness, reason_family_convenience, 
-                                            reason_family_illness, reason_family_illness_who, 
-                                            reason_regular_checkup, reason_checkup_place, 
+                        INSERT INTO absences (user_id, reception_date, reception_staff_id, contact_person,
+                                            absence_start_date, absence_end_date,
+                                            reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
+                                            reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
+                                            reason_rash, reason_self_illness_other_text,
+                                            reason_other_than_self_illness, reason_family_convenience,
+                                            reason_family_illness, reason_family_illness_who,
+                                            reason_regular_checkup, reason_checkup_place,
                                             reason_other_text, support_content, -- Original support content
                                             support_checked_health_confirm, support_content_health_confirm,
                                             support_checked_medical_recommend, support_content_medical_recommend,
                                             support_checked_next_visit, support_date_next_visit,
                                             support_checked_other, support_content_other)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (selected_user_id, reception_date, reception_staff_id, contact_person, 
-                          absence_start_date, absence_end_date, 
+                    ''', (selected_user_id, reception_date, reception_staff_id, contact_person,
+                          absence_start_date, absence_end_date,
                           reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
                           reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
                           reason_rash, reason_self_illness_other_text,
@@ -1027,7 +1032,7 @@ def main():
         st.session_state.page = "日誌一覧"
 
     menu_options = ["日誌一覧", "日誌入力", "排泄入力", "欠席入力", "利用者情報登録", "職員一覧"]
-    
+
     # サイドバーのボタンでページを切り替える
     for option in menu_options:
         if st.sidebar.button(option):
@@ -1046,12 +1051,12 @@ def main():
             # Always clear selected_log_date unless staying on a related page (though input pages will set it)
             if 'selected_log_date' in st.session_state:
                 del st.session_state.selected_log_date
-            st.rerun() 
+            st.rerun()
 
 
     # 選択されたページを表示
     page = st.session_state.page
-    
+
     if page == "日誌一覧":
         show_log_list_page()
     elif page == "日誌入力":
