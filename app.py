@@ -798,29 +798,29 @@ def show_absence_page():
         # Initialize form fields with existing data or defaults
         initial_reception_date = existing_absence_data['reception_date'] if existing_absence_data and existing_absence_data['reception_date'] else initial_log_date
         initial_reception_staff_id = existing_absence_data['reception_staff_id'] if existing_absence_data and existing_absence_data['reception_staff_id'] else None
-        initial_contact_person = existing_absence_data['contact_person'] if existing_absence_data and existing_absence_data['contact_person'] else ""
+        initial_contact_person = existing_absence_data['contact_person'] if existing_absence_data and existing_absence_data['contact_person'] is not None else ""
         initial_absence_start_date = existing_absence_data['absence_start_date'] if existing_absence_data and existing_absence_data['absence_start_date'] else initial_log_date
         initial_absence_end_date = existing_absence_data['absence_end_date'] if existing_absence_data and existing_absence_data['absence_end_date'] else initial_log_date
-        initial_support_content = existing_absence_data['support_content'] if existing_absence_data and existing_absence_data['support_content'] else ""
+        initial_support_content = existing_absence_data['support_content'] if existing_absence_data and existing_absence_data['support_content'] is not None else "" # Ensure empty string not None for text_area
 
         # Detailed reason initial values
-        initial_reason_self_illness = existing_absence_data['reason_self_illness'] if existing_absence_data else False
-        initial_reason_seizure = existing_absence_data['reason_seizure'] if existing_absence_data else False
-        initial_reason_fever = existing_absence_data['reason_fever'] if existing_absence_data else False
-        initial_reason_vomiting = existing_absence_data['reason_vomiting'] if existing_absence_data else False
-        initial_reason_cough = existing_absence_data['reason_cough'] if existing_absence_data else False
-        initial_reason_runny_nose = existing_absence_data['reason_runny_nose'] if existing_absence_data else False
-        initial_reason_diarrhea = existing_absence_data['reason_diarrhea'] if existing_absence_data else False
-        initial_reason_mood_bad = existing_absence_data['reason_mood_bad'] if existing_absence_data else False
-        initial_reason_rash = existing_absence_data['reason_rash'] if existing_absence_data else False
-        initial_reason_self_illness_other_text = existing_absence_data['reason_self_illness_other_text'] if existing_absence_data else ""
-        initial_reason_other_than_self_illness = existing_absence_data['reason_other_than_self_illness'] if existing_absence_data else False
-        initial_reason_family_convenience = existing_absence_data['reason_family_convenience'] if existing_absence_data else False
-        initial_reason_family_illness = existing_absence_data['reason_family_illness'] if existing_absence_data else False
-        initial_reason_family_illness_who = existing_absence_data['reason_family_illness_who'] if existing_absence_data else ""
-        initial_reason_regular_checkup = existing_absence_data['reason_regular_checkup'] if existing_absence_data else False
-        initial_reason_checkup_place = existing_absence_data['reason_checkup_place'] if existing_absence_data else ""
-        initial_reason_other_text = existing_absence_data['reason_other_text'] if existing_absence_data else ""
+        initial_reason_self_illness = existing_absence_data['reason_self_illness'] if existing_absence_data and existing_absence_data['reason_self_illness'] is not None else False
+        initial_reason_seizure = existing_absence_data['reason_seizure'] if existing_absence_data and existing_absence_data['reason_seizure'] is not None else False
+        initial_reason_fever = existing_absence_data['reason_fever'] if existing_absence_data and existing_absence_data['reason_fever'] is not None else False
+        initial_reason_vomiting = existing_absence_data['reason_vomiting'] if existing_absence_data and existing_absence_data['reason_vomiting'] is not None else False
+        initial_reason_cough = existing_absence_data['reason_cough'] if existing_absence_data and existing_absence_data['reason_cough'] is not None else False
+        initial_reason_runny_nose = existing_absence_data['reason_runny_nose'] if existing_absence_data and existing_absence_data['reason_runny_nose'] is not None else False
+        initial_reason_diarrhea = existing_absence_data['reason_diarrhea'] if existing_absence_data and existing_absence_data['reason_diarrhea'] is not None else False
+        initial_reason_mood_bad = existing_absence_data['reason_mood_bad'] if existing_absence_data and existing_absence_data['reason_mood_bad'] is not None else False
+        initial_reason_rash = existing_absence_data['reason_rash'] if existing_absence_data and existing_absence_data['reason_rash'] is not None else False
+        initial_reason_self_illness_other_text = existing_absence_data['reason_self_illness_other_text'] if existing_absence_data and existing_absence_data['reason_self_illness_other_text'] is not None else ""
+        initial_reason_other_than_self_illness = existing_absence_data['reason_other_than_self_illness'] if existing_absence_data and existing_absence_data['reason_other_than_self_illness'] is not None else False
+        initial_reason_family_convenience = existing_absence_data['reason_family_convenience'] if existing_absence_data and existing_absence_data['reason_family_convenience'] is not None else False
+        initial_reason_family_illness = existing_absence_data['reason_family_illness'] if existing_absence_data and existing_absence_data['reason_family_illness'] is not None else False
+        initial_reason_family_illness_who = existing_absence_data['reason_family_illness_who'] if existing_absence_data and existing_absence_data['reason_family_illness_who'] is not None else ""
+        initial_reason_regular_checkup = existing_absence_data['reason_regular_checkup'] if existing_absence_data and existing_absence_data['reason_regular_checkup'] is not None else False
+        initial_reason_checkup_place = existing_absence_data['reason_checkup_place'] if existing_absence_data and existing_absence_data['reason_checkup_place'] is not None else ""
+        initial_reason_other_text = existing_absence_data['reason_other_text'] if existing_absence_data and existing_absence_data['reason_other_text'] is not None else ""
 
 
         with st.form("absence_form"):
@@ -846,56 +846,57 @@ def show_absence_page():
             st.write("---")
             st.write("##### 欠席理由")
 
+            # 本人の体調不良
             reason_self_illness = st.checkbox("本人の体調不良", value=initial_reason_self_illness)
+            reason_seizure = False
+            reason_fever = False
+            reason_vomiting = False
+            reason_cough = False
+            reason_runny_nose = False
+            reason_diarrhea = False
+            reason_mood_bad = False
+            reason_rash = False
+            reason_self_illness_other_text = ""
             if reason_self_illness:
                 col_b1, col_b2, col_b3, col_b4 = st.columns(4)
                 with col_b1:
-                    reason_seizure = st.checkbox("発作", value=initial_reason_seizure)
-                    reason_cough = st.checkbox("咳", value=initial_reason_cough)
+                    reason_seizure = st.checkbox("発作", value=initial_reason_seizure, key="reason_seizure")
+                    reason_cough = st.checkbox("咳", value=initial_reason_cough, key="reason_cough")
                 with col_b2:
-                    reason_fever = st.checkbox("発熱", value=initial_reason_fever)
-                    reason_runny_nose = st.checkbox("鼻水", value=initial_reason_runny_nose)
+                    reason_fever = st.checkbox("発熱", value=initial_reason_fever, key="reason_fever")
+                    reason_runny_nose = st.checkbox("鼻水", value=initial_reason_runny_nose, key="reason_runny_nose")
                 with col_b3:
-                    reason_vomiting = st.checkbox("嘔吐", value=initial_reason_vomiting)
-                    reason_diarrhea = st.checkbox("下痢", value=initial_reason_diarrhea)
+                    reason_vomiting = st.checkbox("嘔吐", value=initial_reason_vomiting, key="reason_vomiting")
+                    reason_diarrhea = st.checkbox("下痢", value=initial_reason_diarrhea, key="reason_diarrhea")
                 with col_b4:
-                    reason_mood_bad = st.checkbox("機嫌不良", value=initial_reason_mood_bad)
-                    reason_rash = st.checkbox("発疹", value=initial_reason_rash)
-                reason_self_illness_other_text = st.text_area("その他（本人の体調不良）", value=initial_reason_self_illness_other_text)
-            else:
-                reason_seizure = False
-                reason_fever = False
-                reason_vomiting = False
-                reason_cough = False
-                reason_runny_nose = False
-                reason_diarrhea = False
-                reason_mood_bad = False
-                reason_rash = False
-                reason_self_illness_other_text = ""
+                    reason_mood_bad = st.checkbox("機嫌不良", value=initial_reason_mood_bad, key="reason_mood_bad")
+                    reason_rash = st.checkbox("発疹", value=initial_reason_rash, key="reason_rash")
+                reason_self_illness_other_text = st.text_area("その他（本人の体調不良）", value=initial_reason_self_illness_other_text, key="reason_self_illness_other_text")
 
+
+            # 本人の体調不良以外
             reason_other_than_self_illness = st.checkbox("本人の体調不良以外", value=initial_reason_other_than_self_illness)
+            reason_family_convenience = False
+            reason_family_illness = False
+            reason_family_illness_who = ""
+            reason_regular_checkup = False
+            reason_checkup_place = ""
+            reason_other_text = ""
             if reason_other_than_self_illness:
-                reason_family_convenience = st.checkbox("家族の都合", value=initial_reason_family_convenience)
-                reason_family_illness = st.checkbox("家族の体調不良", value=initial_reason_family_illness)
+                reason_family_convenience = st.checkbox("家族の都合", value=initial_reason_family_convenience, key="reason_family_convenience")
+                reason_family_illness = st.checkbox("家族の体調不良", value=initial_reason_family_illness, key="reason_family_illness")
                 if reason_family_illness:
-                    reason_family_illness_who = st.text_input("誰が？", value=initial_reason_family_illness_who)
+                    reason_family_illness_who = st.text_input("誰が？", value=initial_reason_family_illness_who, key="reason_family_illness_who")
                 else:
                     reason_family_illness_who = ""
-                reason_regular_checkup = st.checkbox("定期受診", value=initial_reason_regular_checkup)
+                reason_regular_checkup = st.checkbox("定期受診", value=initial_reason_regular_checkup, key="reason_regular_checkup")
                 if reason_regular_checkup:
-                    reason_checkup_place = st.text_input("受診先", value=initial_reason_checkup_place)
+                    reason_checkup_place = st.text_input("受診先", value=initial_reason_checkup_place, key="reason_checkup_place")
                 else:
                     reason_checkup_place = ""
-                reason_other_text = st.text_area("その他（本人の体調不良以外）", value=initial_reason_other_text)
-            else:
-                reason_family_convenience = False
-                reason_family_illness = False
-                reason_family_illness_who = ""
-                reason_regular_checkup = False
-                reason_checkup_place = ""
-                reason_other_text = ""
+                reason_other_text = st.text_area("その他（本人の体調不良以外）", value=initial_reason_other_text, key="reason_other_text")
 
-            support_content = st.text_area("援助内容（詳細を記入）", value=initial_support_content, help="例：体調確認、医療機関の受診を勧めた。")
+            support_content = st.text_area("援助内容（詳細を記入）", value=initial_support_content, help="例：体調確認、医療機関の受診を勧めた。", key="support_content")
 
             submitted = st.form_submit_button("欠席情報を登録/更新")
             if submitted:
@@ -1005,3 +1006,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
