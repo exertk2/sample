@@ -477,22 +477,22 @@ def show_log_input_page():
             st.write("##### バイタル")
             c1, c2, c3, c4, c5 = st.columns(5)
             temperature = c1.number_input("体温", min_value=30.0, max_value=45.0, step=0.1, format="%.1f", 
-                                value=log_data['temperature'] if log_data and log_data['temperature'] is not None else 36.5)
+                                value=log_data['temperature'] if log_data and log_data['temperature'] is not None else 36.5, key="temp_input")
             pulse = c2.number_input("脈", min_value=0, max_value=200, step=1, 
-                                value=log_data['pulse'] if log_data and log_data['pulse'] is not None else 70)
+                                value=log_data['pulse'] if log_data and log_data['pulse'] is not None else 70, key="pulse_input")
             spo2 = c3.number_input("SPO2", min_value=0, max_value=100, step=1, 
-                                value=log_data['spo2'] if log_data and log_data['spo2'] is not None else 98)
+                                value=log_data['spo2'] if log_data and log_data['spo2'] is not None else 98, key="spo2_input")
             bp_high = c4.number_input("最高血圧", min_value=0, max_value=300, step=1, 
-                                value=log_data['bp_high'] if log_data and log_data['bp_high'] is not None else 120)
+                                value=log_data['bp_high'] if log_data and log_data['bp_high'] is not None else 120, key="bph_input")
             bp_low = c5.number_input("最低血圧", min_value=0, max_value=200, step=1, 
-                                value=log_data['bp_low'] if log_data and log_data['bp_low'] is not None else 80)
+                                value=log_data['bp_low'] if log_data and log_data['bp_low'] is not None else 80, key="bpl_input")
             weight = c1.number_input("体重", min_value=0.0, max_value=200.0, step=0.1, format="%.1f", 
-                                value=log_data['weight'] if log_data and log_data['weight'] is not None else 50.0)
+                                value=log_data['weight'] if log_data and log_data['weight'] is not None else 50.0, key="weight_input")
 
             st.write("---")
             st.write("##### 内服・口腔ケア")
             c1, c2 = st.columns(2)
-            medication_check = c1.checkbox("内服実施", value=log_data['medication_check'] if log_data and log_data['medication_check'] is not None else False)
+            medication_check = c1.checkbox("内服実施", value=log_data['medication_check'] if log_data and log_data['medication_check'] is not None else False, key="med_check_input")
             
             medication_staff_selected_index = 0 
             if log_data and log_data['medication_staff_id'] is not None:
@@ -514,7 +514,7 @@ def show_log_input_page():
             )
             
             c1, c2 = st.columns(2)
-            oral_care_check = c1.checkbox("口腔ケア実施", value=log_data['oral_care_check'] if log_data and log_data['oral_care_check'] is not None else False)
+            oral_care_check = c1.checkbox("口腔ケア実施", value=log_data['oral_care_check'] if log_data and log_data['oral_care_check'] is not None else False, key="oral_check_input")
             
             oral_care_staff_selected_index = 0
             if log_data and log_data['oral_care_staff_id'] is not None:
@@ -536,7 +536,7 @@ def show_log_input_page():
 
             st.write("---")
             st.write("##### 入浴")
-            bath_check = st.checkbox("入浴実施", value=log_data['bath_check'] if log_data and log_data['bath_check'] is not None else False)
+            bath_check = st.checkbox("入浴実施", value=log_data['bath_check'] if log_data and log_data['bath_check'] is not None else False, key="bath_check_input")
             c1, c2, c3, c4 = st.columns(4)
             
             # Convert stored time string to datetime.time object for time_input
@@ -561,7 +561,7 @@ def show_log_input_page():
             # 入浴実施が未チェックの場合、または臨時利用者ではない場合のみ disabled
             disable_bath_input = (not bath_check) and (not is_temporary_user_for_log_date)
 
-            bath_start_time = c1.time_input("入浴開始時間", value=bath_start_time_val, disabled=disable_bath_input)
+            bath_start_time = c1.time_input("入浴開始時間", value=bath_start_time_val, disabled=disable_bath_input, key="bath_start_time_input")
             
             bath_start_staff_selected_index = 0
             if log_data and log_data['bath_start_staff_id'] is not None:
@@ -578,7 +578,7 @@ def show_log_input_page():
                 disabled=disable_bath_input
             )
             
-            bath_end_time = c3.time_input("入浴終了時間", value=bath_end_time_val, disabled=disable_bath_input)
+            bath_end_time = c3.time_input("入浴終了時間", value=bath_end_time_val, disabled=disable_bath_input, key="bath_end_time_input")
             
             bath_end_staff_selected_index = 0
             if log_data and log_data['bath_end_staff_id'] is not None:
@@ -596,9 +596,9 @@ def show_log_input_page():
             )
 
             st.write("---")
-            health_notes = st.text_area("特記（体調面）", value=log_data['health_notes'] if log_data and log_data['health_notes'] is not None else "")
-            memo1 = st.text_area("その他１", value=log_data['memo1'] if log_data and log_data['memo1'] is not None else "")
-            memo2 = st.text_area("その他２", value=log_data['memo2'] if log_data and log_data['memo2'] is not None else "")
+            health_notes = st.text_area("特記（体調面）", value=log_data['health_notes'] if log_data and log_data['health_notes'] is not None else "", key="health_notes_input")
+            memo1 = st.text_area("その他１", value=log_data['memo1'] if log_data and log_data['memo1'] is not None else "", key="memo1_input")
+            memo2 = st.text_area("その他２", value=log_data['memo2'] if log_data and log_data['memo2'] is not None else "", key="memo2_input")
 
             submitted = st.form_submit_button("日誌を保存")
             if submitted:
@@ -668,8 +668,8 @@ def show_excretion_page():
             st.write(f"##### {user_options[selected_user_id]}さんの排泄記録")
             
             c1, c2 = st.columns(2)
-            excretion_time = c1.time_input("排泄時間", value=current_jst_time)
-            excretion_type = c2.selectbox("分類", ["尿", "便"], index=None) # Start with no default selection
+            excretion_time = c1.time_input("排泄時間", value=current_jst_time, key="excretion_time_input")
+            excretion_type = c2.selectbox("分類", ["尿", "便"], index=None, key="excretion_type_selectbox") # Start with no default selection
             
             c1, c2 = st.columns(2)
             # For staff1_id:
@@ -692,7 +692,7 @@ def show_excretion_page():
                 key="excretion_staff2_selectbox"
             )
             
-            notes = st.text_area("特記事項（体調面）")
+            notes = st.text_area("特記事項（体調面）", key="excretion_notes_textarea")
             
             submitted = st.form_submit_button("記録を追加")
             
@@ -761,7 +761,8 @@ def show_absence_page():
         "欠席者を選択",
         options=list(user_options.keys()),
         format_func=lambda x: user_options.get(x),
-        index=selected_user_index
+        index=selected_user_index,
+        key="absence_user_select" # Add unique key
     )
 
     if selected_user_id:
@@ -788,7 +789,7 @@ def show_absence_page():
         initial_support_content = json.loads(existing_absence['support_content']) if existing_absence and existing_absence['support_content'] else {}
 
 
-        with st.form("absence_form"):
+        with st.form("absence_form"): # This is the form context
             st.write(f"##### {user_options[selected_user_id]}さんの欠席情報")
             c1, c2 = st.columns(2)
             
@@ -806,22 +807,23 @@ def show_absence_page():
                 options=list(staff_options_with_none.keys()), 
                 format_func=lambda x: staff_options_with_none.get(x), 
                 index=reception_staff_selected_index,
-                key="reception_staff_selectbox"
+                key="reception_staff_selectbox_absence" # Unique key
             )
-            reception_date = c2.date_input("受付日", initial_reception_date)
+            reception_date = c2.date_input("受付日", initial_reception_date, key="reception_date_absence") # Unique key
 
-            contact_person = st.text_input("欠席の連絡者", value=initial_contact_person)
+            contact_person = st.text_input("欠席の連絡者", value=initial_contact_person, key="contact_person_absence") # Unique key
             
             c1, c2 = st.columns(2)
-            absence_start_date = c1.date_input("欠席期間（開始）", initial_absence_start_date)
-            absence_end_date = c2.date_input("欠席期間（終了）", initial_absence_end_date)
+            absence_start_date = c1.date_input("欠席期間（開始）", initial_absence_start_date, key="absence_start_date_absence") # Unique key
+            absence_end_date = c2.date_input("欠席期間（終了）", initial_absence_end_date, key="absence_end_date_absence") # Unique key
             
             st.write("---")
             st.write("##### 欠席理由")
             reason_type = st.radio(
                 "欠席理由の分類",
                 ("本人の体調不良", "本人の体調不良以外"),
-                index=("本人の体調不良", "本人の体調不良以外").index(initial_reason_type)
+                index=("本人の体調不良", "本人の体調不良以外").index(initial_reason_type),
+                key="reason_type_absence" # Unique key
             )
 
             reason_details = {} # This will store the structured reason details
@@ -830,44 +832,44 @@ def show_absence_page():
                 st.write("###### 体調不良の詳細")
                 col_sick1, col_sick2, col_sick3, col_sick4 = st.columns(4)
                 with col_sick1:
-                    reason_details['発作'] = st.checkbox("発作", value=initial_reason_details.get('発作', False))
-                    reason_details['発熱'] = st.checkbox("発熱", value=initial_reason_details.get('発熱', False))
+                    reason_details['発作'] = st.checkbox("発作", value=initial_reason_details.get('発作', False), key="sick_hassaku_absence") # Unique key
+                    reason_details['発熱'] = st.checkbox("発熱", value=initial_reason_details.get('発熱', False), key="sick_hatsunetsu_absence") # Unique key
                 with col_sick2:
-                    reason_details['嘔吐'] = st.checkbox("嘔吐", value=initial_reason_details.get('嘔吐', False))
-                    reason_details['咳'] = st.checkbox("咳", value=initial_reason_details.get('咳', False))
+                    reason_details['嘔吐'] = st.checkbox("嘔吐", value=initial_reason_details.get('嘔吐', False), key="sick_outo_absence") # Unique key
+                    reason_details['咳'] = st.checkbox("咳", value=initial_reason_details.get('咳', False), key="sick_seki_absence") # Unique key
                 with col_sick3:
-                    reason_details['鼻水'] = st.checkbox("鼻水", value=initial_reason_details.get('鼻水', False))
-                    reason_details['下痢'] = st.checkbox("下痢", value=initial_reason_details.get('下痢', False))
+                    reason_details['鼻水'] = st.checkbox("鼻水", value=initial_reason_details.get('鼻水', False), key="sick_hanamizu_absence") # Unique key
+                    reason_details['下痢'] = st.checkbox("下痢", value=initial_reason_details.get('下痢', False), key="sick_geri_absence") # Unique key
                 with col_sick4:
-                    reason_details['機嫌不良'] = st.checkbox("機嫌不良", value=initial_reason_details.get('機嫌不良', False))
-                    reason_details['発疹'] = st.checkbox("発疹", value=initial_reason_details.get('発疹', False))
-                reason_details['その他_本人体調不良'] = st.text_area("その他（本人の体調不良）", value=initial_reason_details.get('その他_本人体調不良', ""))
+                    reason_details['機嫌不良'] = st.checkbox("機嫌不良", value=initial_reason_details.get('機嫌不良', False), key="sick_kigenfuryo_absence") # Unique key
+                    reason_details['発疹'] = st.checkbox("発疹", value=initial_reason_details.get('発疹', False), key="sick_hasshin_absence") # Unique key
+                reason_details['その他_本人体調不良'] = st.text_area("その他（本人の体調不良）", value=initial_reason_details.get('その他_本人体調不良', ""), key="sick_other_absence") # Unique key
             else: # 本人の体調不良以外
                 st.write("###### 体調不良以外の理由の詳細")
-                reason_details['家族の都合'] = st.checkbox("家族の都合", value=initial_reason_details.get('家族の都合', False))
-                reason_details['家族の体調不良'] = st.checkbox("家族の体調不良", value=initial_reason_details.get('家族の体調不良', False))
+                reason_details['家族の都合'] = st.checkbox("家族の都合", value=initial_reason_details.get('家族の都合', False), key="reason_kazoku_tsugou_absence") # Unique key
+                reason_details['家族の体調不良'] = st.checkbox("家族の体調不良", value=initial_reason_details.get('家族の体調不良', False), key="reason_kazoku_taichofuryo_absence") # Unique key
                 if reason_details['家族の体調不良']:
-                    reason_details['家族の体調不良_誰が'] = st.text_input("誰が？", value=initial_reason_details.get('家族の体調不良_誰が', ""))
+                    reason_details['家族の体調不良_誰が'] = st.text_input("誰が？", value=initial_reason_details.get('家族の体調不良_誰が', ""), key="reason_kazoku_taichofuryo_darega_absence") # Unique key
                 
-                reason_details['定期受診'] = st.checkbox("定期受診", value=initial_reason_details.get('定期受診', False))
+                reason_details['定期受診'] = st.checkbox("定期受診", value=initial_reason_details.get('定期受診', False), key="reason_teikijushin_absence") # Unique key
                 if reason_details['定期受診']:
-                    reason_details['定期受診_受診先'] = st.text_input("受診先", value=initial_reason_details.get('定期受診_受診先', ""))
+                    reason_details['定期受診_受診先'] = st.text_input("受診先", value=initial_reason_details.get('定期受診_受診先', ""), key="reason_teikijushin_jushinsaki_absence") # Unique key
                 
-                reason_details['その他_本人体調不良以外'] = st.text_area("その他（本人の体調不良以外）", value=initial_reason_details.get('その他_本人体調不良以外', ""))
+                reason_details['その他_本人体調不良以外'] = st.text_area("その他（本人の体調不良以外）", value=initial_reason_details.get('その他_本人体調不良以外', ""), key="reason_other_else_absence") # Unique key
 
             st.write("---")
             st.write("##### 援助内容")
             support_content = {} # This will store the structured support content
 
-            support_content['体調を確認した'] = st.checkbox("体調を確認した", value=initial_support_content.get('体調を確認した', False))
+            support_content['体調を確認した'] = st.checkbox("体調を確認した", value=initial_support_content.get('体調を確認した', False), key="support_taichoukakunin_absence") # Unique key
             if support_content['体調を確認した']:
-                support_content['体調を確認した_内容'] = st.text_area("内容（体調確認）", value=initial_support_content.get('体調を確認した_内容', ""))
+                support_content['体調を確認した_内容'] = st.text_area("内容（体調確認）", value=initial_support_content.get('体調を確認した_内容', ""), key="support_taichoukakunin_naiyou_absence") # Unique key
             
-            support_content['医療機関の受診を勧めた'] = st.checkbox("医療機関の受診を勧めた", value=initial_support_content.get('医療機関の受診を勧めた', False))
+            support_content['医療機関の受診を勧めた'] = st.checkbox("医療機関の受診を勧めた", value=initial_support_content.get('医療機関の受診を勧めた', False), key="support_iryokikan_absence") # Unique key
             if support_content['医療機関の受診を勧めた']:
-                support_content['医療機関の受診を勧めた_内容'] = st.text_input("内容（受診勧告）", value=initial_support_content.get('医療機関の受診を勧めた_内容', ""))
+                support_content['医療機関の受診を勧めた_内容'] = st.text_input("内容（受診勧告）", value=initial_support_content.get('医療機関の受診を勧めた_内容', ""), key="support_iryokikan_naiyou_absence") # Unique key
             
-            support_content['次回利用日を確認した'] = st.checkbox("次回利用日を確認した", value=initial_support_content.get('次回利用日を確認した', False))
+            support_content['次回利用日を確認した'] = st.checkbox("次回利用日を確認した", value=initial_support_content.get('次回利用日を確認した', False), key="support_jikairiyoubi_absence") # Unique key
             if support_content['次回利用日を確認した']:
                 # Handle initial_support_content.get('次回利用日を確認した_日付') which might be string or None
                 initial_next_use_date = None
@@ -877,13 +879,15 @@ def show_absence_page():
                     except ValueError:
                         pass # Keep None if parsing fails or data is bad
                 
-                support_content['次回利用日を確認した_日付'] = st.date_input("日付", value=initial_next_use_date or current_jst_date)
+                support_content['次回利用日を確認した_日付'] = st.date_input("日付", value=initial_next_use_date or current_jst_date, key="support_jikairiyoubi_date_absence") # Unique key
             
-            support_content['その他_援助内容'] = st.checkbox("その他（援助内容）", value=initial_support_content.get('その他_援助内容', False))
+            support_content['その他_援助内容'] = st.checkbox("その他（援助内容）", value=initial_support_content.get('その他_援助内容', False), key="support_other_absence") # Unique key
             if support_content['その他_援助内容']:
-                support_content['その他_援助内容_内容'] = st.text_area("内容（その他援助）", value=initial_support_content.get('その他_援助内容_内容', ""))
+                support_content['その他_援助内容_内容'] = st.text_area("内容（その他援助）", value=initial_support_content.get('その他_援助内容_内容', ""), key="support_other_naiyou_absence") # Unique key
 
-            submitted = st.form_submit_button("欠席情報を登録/更新")
+            # Moving the submit button to the very end of the form block
+            submitted = st.form_submit_button("欠席情報を登録/更新", key="submit_absence_form") # Unique key for the submit button
+            
             if submitted:
                 # データベースへの保存処理
                 conn = get_db_connection()
