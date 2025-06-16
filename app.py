@@ -100,14 +100,31 @@ elif choice == "申請入力":
         with st.form("application_input_form"):
             st.subheader("申請対象の選択（上書き対象の検索にも利用）")
 
+            # 現在の年月日から年度を判定
+            now = datetime.now(JST)
+            if now.month >= 4: # 4月～12月は現在の年
+                initial_fiscal_year = now.year
+            else: # 1月～3月は前年
+                initial_fiscal_year = now.year - 1
+
+            # 年度選択肢と初期値のインデックスを設定
+            fiscal_years_options = [f"{year}年度" for year in range(initial_fiscal_year - 2, initial_fiscal_year + 3)]
+            try:
+                default_fiscal_year_index = fiscal_years_options.index(f"{initial_fiscal_year}年度")
+            except ValueError:
+                default_fiscal_year_index = 0 # 見つからない場合は最初の要素を選択
+
             # 申請対象の選択部分を横に並べる
             col_select1, col_select2, col_select3 = st.columns(3)
             with col_select1:
                 selected_staff_name = st.selectbox("職員氏名", staff_names, key="search_staff_name")
             with col_select2:
-                current_year = datetime.now().year
-                fiscal_years = [f"{year}年度" for year in range(current_year - 2, current_year + 3)]
-                selected_fiscal_year_str = st.selectbox("年度", fiscal_years, key="search_fiscal_year")
+                selected_fiscal_year_str = st.selectbox(
+                    "年度",
+                    fiscal_years_options,
+                    index=default_fiscal_year_index, # 初期値を設定
+                    key="search_fiscal_year"
+                )
                 selected_fiscal_year = int(selected_fiscal_year_str.replace("年度", ""))
             with col_select3:
                 input_number = st.number_input("ナンバー (4桁のみ)", min_value=0, max_value=9999, step=1, key="number_input")
