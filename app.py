@@ -317,6 +317,7 @@ elif choice == "申請一覧":
         display_columns = [
             'id',
             'staff_name',
+            '年度',
             'car_name',
             'color',
             'number',
@@ -324,8 +325,7 @@ elif choice == "申請一覧":
             '対物無制限',
             '通勤目的',
             '目的不明',
-            'registration_timestamp',
-            '年度'
+            'registration_timestamp'
         ]
         df_display = df_applications[display_columns]
 
