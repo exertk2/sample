@@ -46,11 +46,10 @@ init_db()
 JST = pytz.timezone('Asia/Tokyo')
 
 st.set_page_config(layout="wide")
-st.title("通勤申請アプリ")
 
 # --- メニュー (ラジオボタン) ---
 menu = ["申請入力", "申請一覧", "職員登録"]
-choice = st.sidebar.radio("メニュー", menu)
+choice = st.sidebar.radio("通勤車両管理アプリ", menu)
 
 # --- 職員登録 ---
 if choice == "職員登録":
