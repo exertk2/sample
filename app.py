@@ -2,6 +2,7 @@ import streamlit as st
 import sqlite3
 from datetime import datetime
 import pytz # タイムゾーンを扱うためにpytzをインポート
+import pandas as pd # データフレーム表示のためにpandasをインポート
 
 # データベース接続
 def get_db_connection():
@@ -47,9 +48,9 @@ JST = pytz.timezone('Asia/Tokyo')
 st.set_page_config(layout="wide")
 st.title("通勤申請アプリ")
 
-# --- メニュー ---
+# --- メニュー (ラジオボタン) ---
 menu = ["申請入力", "申請一覧", "職員登録"]
-choice = st.sidebar.selectbox("メニュー", menu)
+choice = st.sidebar.radio("メニュー", menu)
 
 # --- 職員登録 ---
 if choice == "職員登録":
@@ -78,8 +79,9 @@ if choice == "職員登録":
     staffs = conn.execute("SELECT * FROM staffs").fetchall()
     conn.close()
     if staffs:
-        for staff in staffs:
-            st.write(f"- {staff['name']}")
+        # Streamlitのデータフレーム表示を使用
+        df_staffs = pd.DataFrame([dict(row) for row in staffs])
+        st.dataframe(df_staffs, hide_index=True)
     else:
         st.info("登録されている職員はいません。")
 
@@ -112,17 +114,16 @@ elif choice == "申請入力":
             color = st.text_input("色", key="color_input")
             number = st.number_input("ナンバー (4桁のみ)", min_value=0, max_value=9999, step=1, key="number_input")
 
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4) # 目的不明チェックのためにカラムを4つに増やす
             with col1:
                 unlimited_personal = st.checkbox("対人無制限チェック", key="unlimited_personal_check")
             with col2:
                 unlimited_property = st.checkbox("対物無制限チェック", key="unlimited_property_check")
             with col3:
                 commuting_purpose = st.checkbox("通勤目的チェック", key="commuting_purpose_check")
-                if commuting_purpose: # 「通勤目的チェック」がONの場合のみ表示
-                    purpose_unknown = st.checkbox("目的不明チェック", key="purpose_unknown_check")
-                else:
-                    purpose_unknown = False # 「通勤目的チェック」がOFFなら目的不明は常にFalse
+            with col4: # 常に表示
+                purpose_unknown = st.checkbox("目的不明チェック", key="purpose_unknown_check")
+
 
             submit_button = st.form_submit_button("登録")
 
@@ -143,9 +144,6 @@ elif choice == "申請入力":
                         # 登録日時 (日本時間)
                         now_jst = datetime.now(JST)
 
-                        # 年度換算 (登録日時の年度を使用)
-                        # fiscal_year_from_registration = now_jst.year if now_jst.month >= 4 else now_jst.year - 1 # 4月始まりの年度
-
                         cursor.execute(
                             "INSERT INTO applications (staff_id, car_name, color, number, unlimited_personal, unlimited_property, commuting_purpose, purpose_unknown, registration_timestamp, fiscal_year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             (selected_staff_id, car_name, color, number, unlimited_personal, unlimited_property, commuting_purpose, purpose_unknown, now_jst, selected_fiscal_year)
@@ -164,11 +162,11 @@ elif choice == "申請一覧":
     conn = get_db_connection()
     staffs = conn.execute("SELECT id, name FROM staffs").fetchall()
     conn.close()
-    staff_names = {staff['id']: staff['name'] for staff in staffs} # IDから名前を引けるように辞書を作成
+    staff_names_map = {staff['id']: staff['name'] for staff in staffs} # IDから名前を引けるように辞書を作成
 
     # 検索条件
     st.subheader("検索条件")
-    search_staff_name = st.selectbox("職員氏名 (検索)", [""] + list(staff_names.values()), key="list_search_staff_name")
+    search_staff_name = st.selectbox("職員氏名 (検索)", [""] + sorted(list(staff_names_map.values())), key="list_search_staff_name") # ソートして表示
     search_fiscal_year_options = [""] + [f"{year}年度" for year in range(datetime.now().year - 5, datetime.now().year + 2)]
     search_fiscal_year_str = st.selectbox("年度 (検索)", search_fiscal_year_options, key="list_search_fiscal_year")
     search_fiscal_year = int(search_fiscal_year_str.replace("年度", "")) if search_fiscal_year_str else None
@@ -206,19 +204,43 @@ elif choice == "申請一覧":
 
     if applications:
         st.write(f"{len(applications)}件の申請が見つかりました。")
-        for app in applications:
-            st.markdown(f"---")
-            st.write(f"**申請ID:** {app['id']}")
-            st.write(f"**職員氏名:** {app['staff_name']}")
-            st.write(f"**車名:** {app['car_name']}")
-            st.write(f"**色:** {app['color']}")
-            st.write(f"**ナンバー:** {app['number']}")
-            st.write(f"**対人無制限:** {'✔' if app['unlimited_personal'] else ' '}")
-            st.write(f"**対物無制限:** {'✔' if app['unlimited_property'] else ' '}")
-            st.write(f"**通勤目的:** {'✔' if app['commuting_purpose'] else ' '}")
-            if app['commuting_purpose']: # 通勤目的がチェックされている場合のみ表示
-                st.write(f"**目的不明:** {'✔' if app['purpose_unknown'] else ' '}")
-            st.write(f"**登録日時:** {app['registration_timestamp']}")
-            st.write(f"**年度:** {app['fiscal_year']}年度")
+
+        # データフレームに変換して表示
+        df_applications = pd.DataFrame([dict(row) for row in applications])
+
+        # 表示用の加工
+        df_applications['対人無制限'] = df_applications['unlimited_personal'].apply(lambda x: '✔' if x else '')
+        df_applications['対物無制限'] = df_applications['unlimited_property'].apply(lambda x: '✔' if x else '')
+        df_applications['通勤目的'] = df_applications['commuting_purpose'].apply(lambda x: '✔' if x else '')
+        df_applications['目的不明'] = df_applications['purpose_unknown'].apply(lambda x: '✔' if x else '')
+        df_applications['年度'] = df_applications['fiscal_year'].astype(str) + '年度'
+
+        # 表示するカラムを選択・並び替え
+        display_columns = [
+            'id',
+            'staff_name',
+            'car_name',
+            'color',
+            'number',
+            '対人無制限',
+            '対物無制限',
+            '通勤目的',
+            '目的不明',
+            'registration_timestamp',
+            '年度'
+        ]
+        df_display = df_applications[display_columns]
+
+        # カラム名を日本語にリネーム
+        df_display = df_display.rename(columns={
+            'id': 'ID',
+            'staff_name': '職員氏名',
+            'car_name': '車名',
+            'color': '色',
+            'number': 'ナンバー',
+            'registration_timestamp': '登録日時'
+        })
+
+        st.dataframe(df_display, hide_index=True)
     else:
         st.info("該当する申請はありません。")
