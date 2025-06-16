@@ -172,7 +172,7 @@ elif choice == "申請入力":
             with col_checkbox1:
                 unlimited_personal = st.checkbox("対人無制限チェック", value=initial_unlimited_personal, key="unlimited_personal_check")
             with col_checkbox2:
-                unlimited_property = st.checkbox("対物無制限チェック", value=initial_unlimited_property, key="unlimited_property_check")
+                unlimited_property = st.checkbox("対物無制限チェック", value=initial_property_purpose, key="unlimited_property_check")
             with col_checkbox3:
                 commuting_purpose = st.checkbox("通勤目的チェック", value=initial_commuting_purpose, key="commuting_purpose_check")
             with col_checkbox4:
@@ -232,12 +232,32 @@ elif choice == "申請一覧":
 
     # 検索条件
     st.subheader("検索条件")
+
+    # 現在の年月日から年度を判定 (申請入力と同様のロジック)
+    now = datetime.now(JST)
+    if now.month >= 4: # 4月～12月は現在の年
+        initial_fiscal_year_list = now.year
+    else: # 1月～3月は前年
+        initial_fiscal_year_list = now.year - 1
+
+    # 年度選択肢と初期値のインデックスを設定 (申請一覧では「すべて」オプションがあるため少し異なる)
+    search_fiscal_year_options = ["すべて"] + [f"{year}年度" for year in range(initial_fiscal_year_list - 5, initial_fiscal_year_list + 2)]
+    try:
+        # 「すべて」を除いたリストでインデックスを検索し、+1する
+        default_fiscal_year_list_index = search_fiscal_year_options.index(f"{initial_fiscal_year_list}年度")
+    except ValueError:
+        default_fiscal_year_list_index = 0 # 見つからない場合は「すべて」を選択
+
     col_list_search1, col_list_search2 = st.columns(2) # 検索条件を横に並べるために2カラムにする
 
     with col_list_search1:
-        search_fiscal_year_options = [""] + [f"{year}年度" for year in range(datetime.now().year - 5, datetime.now().year + 2)]
-        search_fiscal_year_str = st.selectbox("年度 (検索)", search_fiscal_year_options, key="list_search_fiscal_year")
-        search_fiscal_year = int(search_fiscal_year_str.replace("年度", "")) if search_fiscal_year_str else None
+        search_fiscal_year_str = st.selectbox(
+            "年度 (検索)",
+            search_fiscal_year_options,
+            index=default_fiscal_year_list_index, # 初期値を設定
+            key="list_search_fiscal_year"
+        )
+        search_fiscal_year = int(search_fiscal_year_str.replace("年度", "")) if search_fiscal_year_str != "すべて" else None
 
     with col_list_search2:
         # ナンバー検索はテキスト入力とし、入力がなければ全件対象
