@@ -98,7 +98,7 @@ elif choice == "申請入力":
         st.warning("先に職員登録を行ってください。")
     else:
         with st.form("application_input_form"):
-            st.subheader("検索条件 (申請の重複チェックに使用)")
+            st.subheader("申請対象の選択（上書き対象の検索にも利用）")
             selected_staff_name = st.selectbox("職員氏名", staff_names, key="search_staff_name")
 
             # 職員名が選択されていない場合（初期状態など）のハンドリング
@@ -106,61 +106,93 @@ elif choice == "申請入力":
                 selected_staff_id = staff_options[selected_staff_name]
             else:
                 selected_staff_id = None # またはエラーメッセージ表示など
+                st.stop() # 職員が選択されていなければ処理を中断
 
             current_year = datetime.now().year
             fiscal_years = [f"{year}年度" for year in range(current_year - 2, current_year + 3)]
             selected_fiscal_year_str = st.selectbox("年度", fiscal_years, key="search_fiscal_year")
             selected_fiscal_year = int(selected_fiscal_year_str.replace("年度", ""))
 
+            # ナンバー入力
+            input_number = st.number_input("ナンバー (4桁のみ)", min_value=0, max_value=9999, step=1, key="number_input")
+
+            # 既存データがあれば、初期値としてフォームにセット
+            existing_application = None
+            if selected_staff_id is not None and input_number is not None:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT * FROM applications WHERE staff_id = ? AND fiscal_year = ? AND number = ?",
+                    (selected_staff_id, selected_fiscal_year, input_number)
+                )
+                existing_application = cursor.fetchone()
+                conn.close()
+
+            # 既存データが存在する場合、その値を初期値として設定
+            initial_car_name = existing_application['car_name'] if existing_application else ""
+            initial_color = existing_application['color'] if existing_application else ""
+            initial_unlimited_personal = existing_application['unlimited_personal'] if existing_application else False
+            initial_unlimited_property = existing_application['unlimited_property'] if existing_application else False
+            initial_commuting_purpose = existing_application['commuting_purpose'] if existing_application else False
+            initial_purpose_unknown = existing_application['purpose_unknown'] if existing_application else False
+
 
             st.subheader("入力項目")
-            car_name = st.text_input("車名", key="car_name_input")
-            color = st.text_input("色", key="color_input")
-            number = st.number_input("ナンバー (4桁のみ)", min_value=0, max_value=9999, step=1, key="number_input")
+            car_name = st.text_input("車名", value=initial_car_name, key="car_name_input")
+            color = st.text_input("色", value=initial_color, key="color_input")
 
-            col1, col2, col3, col4 = st.columns(4) # 目的不明チェックのためにカラムを4つに増やす
+            col1, col2, col3, col4 = st.columns(4)
             with col1:
-                unlimited_personal = st.checkbox("対人無制限チェック", key="unlimited_personal_check")
+                unlimited_personal = st.checkbox("対人無制限チェック", value=initial_unlimited_personal, key="unlimited_personal_check")
             with col2:
-                unlimited_property = st.checkbox("対物無制限チェック", key="unlimited_property_check")
+                unlimited_property = st.checkbox("対物無制限チェック", value=initial_unlimited_property, key="unlimited_property_check")
             with col3:
-                commuting_purpose = st.checkbox("通勤目的チェック", key="commuting_purpose_check")
-            with col4: # 常に表示
-                purpose_unknown = st.checkbox("目的不明チェック", key="purpose_unknown_check")
+                commuting_purpose = st.checkbox("通勤目的チェック", value=initial_commuting_purpose, key="commuting_purpose_check")
+            with col4:
+                purpose_unknown = st.checkbox("目的不明チェック", value=initial_purpose_unknown, key="purpose_unknown_check")
 
 
-            submit_button = st.form_submit_button("登録")
+            submit_button = st.form_submit_button("登録 / 修正")
 
             if submit_button:
                 if selected_staff_id is None:
                     st.error("職員氏名を選択してください。")
+                elif not car_name:
+                    st.error("車名を入力してください。")
+                elif not color:
+                    st.error("色を入力してください。")
                 else:
-                    # 重複チェック: 同一職員、同一年度、同一ナンバーのレコードがないか確認
                     conn = get_db_connection()
                     cursor = conn.cursor()
-                    cursor.execute(
-                        "SELECT COUNT(*) FROM applications WHERE staff_id = ? AND fiscal_year = ? AND number = ?",
-                        (selected_staff_id, selected_fiscal_year, number)
-                    )
-                    duplicate_count = cursor.fetchone()[0]
+                    try:
+                        now_jst = datetime.now(JST)
 
-                    if duplicate_count > 0:
-                        st.warning("この職員、年度、ナンバーの組み合わせは既に登録されています。")
-                    else:
-                        try:
-                            # 登録日時 (日本時間)
-                            now_jst = datetime.now(JST)
-
+                        if existing_application:
+                            # 既存データが存在する場合、更新
+                            cursor.execute(
+                                """
+                                UPDATE applications
+                                SET car_name = ?, color = ?, unlimited_personal = ?, unlimited_property = ?,
+                                    commuting_purpose = ?, purpose_unknown = ?, registration_timestamp = ?
+                                WHERE staff_id = ? AND fiscal_year = ? AND number = ?
+                                """,
+                                (car_name, color, unlimited_personal, unlimited_property,
+                                 commuting_purpose, purpose_unknown, now_jst,
+                                 selected_staff_id, selected_fiscal_year, input_number)
+                            )
+                            st.success("申請を修正しました。")
+                        else:
+                            # 新規登録
                             cursor.execute(
                                 "INSERT INTO applications (staff_id, car_name, color, number, unlimited_personal, unlimited_property, commuting_purpose, purpose_unknown, registration_timestamp, fiscal_year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                (selected_staff_id, car_name, color, number, unlimited_personal, unlimited_property, commuting_purpose, purpose_unknown, now_jst, selected_fiscal_year)
+                                (selected_staff_id, car_name, color, input_number, unlimited_personal, unlimited_property, commuting_purpose, purpose_unknown, now_jst, selected_fiscal_year)
                             )
-                            conn.commit()
                             st.success("申請を登録しました。")
-                        except Exception as e:
-                            st.error(f"登録中にエラーが発生しました: {e}")
-                        finally:
-                            conn.close()
+                        conn.commit()
+                    except Exception as e:
+                        st.error(f"処理中にエラーが発生しました: {e}")
+                    finally:
+                        conn.close()
 
 # --- 申請一覧 ---
 elif choice == "申請一覧":
@@ -213,6 +245,9 @@ elif choice == "申請一覧":
     if search_number is not None: # Noneでない場合のみ条件を追加
         query += " AND a.number = ?"
         params.append(search_number)
+
+    # 登録日時が新しい順にソート
+    query += " ORDER BY a.registration_timestamp DESC"
 
     conn = get_db_connection()
     applications = conn.execute(query, params).fetchall()
