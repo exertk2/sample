@@ -101,7 +101,12 @@ elif choice == "申請入力":
         with st.form("application_input_form"):
             st.subheader("検索条件 (申請の重複チェックに使用)")
             selected_staff_name = st.selectbox("職員氏名", staff_names, key="search_staff_name")
-            selected_staff_id = staff_options[selected_staff_name]
+
+            # 職員名が選択されていない場合（初期状態など）のハンドリング
+            if selected_staff_name:
+                selected_staff_id = staff_options[selected_staff_name]
+            else:
+                selected_staff_id = None # またはエラーメッセージ表示など
 
             current_year = datetime.now().year
             fiscal_years = [f"{year}年度" for year in range(current_year - 2, current_year + 3)]
@@ -128,32 +133,35 @@ elif choice == "申請入力":
             submit_button = st.form_submit_button("登録")
 
             if submit_button:
-                # 重複チェック: 同一職員、同一年度、同一ナンバーのレコードがないか確認
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT COUNT(*) FROM applications WHERE staff_id = ? AND fiscal_year = ? AND number = ?",
-                    (selected_staff_id, selected_fiscal_year, number)
-                )
-                duplicate_count = cursor.fetchone()[0]
-
-                if duplicate_count > 0:
-                    st.warning("この職員、年度、ナンバーの組み合わせは既に登録されています。")
+                if selected_staff_id is None:
+                    st.error("職員氏名を選択してください。")
                 else:
-                    try:
-                        # 登録日時 (日本時間)
-                        now_jst = datetime.now(JST)
+                    # 重複チェック: 同一職員、同一年度、同一ナンバーのレコードがないか確認
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM applications WHERE staff_id = ? AND fiscal_year = ? AND number = ?",
+                        (selected_staff_id, selected_fiscal_year, number)
+                    )
+                    duplicate_count = cursor.fetchone()[0]
 
-                        cursor.execute(
-                            "INSERT INTO applications (staff_id, car_name, color, number, unlimited_personal, unlimited_property, commuting_purpose, purpose_unknown, registration_timestamp, fiscal_year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                            (selected_staff_id, car_name, color, number, unlimited_personal, unlimited_property, commuting_purpose, purpose_unknown, now_jst, selected_fiscal_year)
-                        )
-                        conn.commit()
-                        st.success("申請を登録しました。")
-                    except Exception as e:
-                        st.error(f"登録中にエラーが発生しました: {e}")
-                    finally:
-                        conn.close()
+                    if duplicate_count > 0:
+                        st.warning("この職員、年度、ナンバーの組み合わせは既に登録されています。")
+                    else:
+                        try:
+                            # 登録日時 (日本時間)
+                            now_jst = datetime.now(JST)
+
+                            cursor.execute(
+                                "INSERT INTO applications (staff_id, car_name, color, number, unlimited_personal, unlimited_property, commuting_purpose, purpose_unknown, registration_timestamp, fiscal_year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                (selected_staff_id, car_name, color, number, unlimited_personal, unlimited_property, commuting_purpose, purpose_unknown, now_jst, selected_fiscal_year)
+                            )
+                            conn.commit()
+                            st.success("申請を登録しました。")
+                        except Exception as e:
+                            st.error(f"登録中にエラーが発生しました: {e}")
+                        finally:
+                            conn.close()
 
 # --- 申請一覧 ---
 elif choice == "申請一覧":
@@ -166,10 +174,19 @@ elif choice == "申請一覧":
 
     # 検索条件
     st.subheader("検索条件")
-    search_staff_name = st.selectbox("職員氏名 (検索)", [""] + sorted(list(staff_names_map.values())), key="list_search_staff_name") # ソートして表示
-    search_fiscal_year_options = [""] + [f"{year}年度" for year in range(datetime.now().year - 5, datetime.now().year + 2)]
-    search_fiscal_year_str = st.selectbox("年度 (検索)", search_fiscal_year_options, key="list_search_fiscal_year")
-    search_fiscal_year = int(search_fiscal_year_str.replace("年度", "")) if search_fiscal_year_str else None
+    col_list_search1, col_list_search2 = st.columns(2) # 検索条件を横に並べるために2カラムにする
+
+    with col_list_search1:
+        search_fiscal_year_options = [""] + [f"{year}年度" for year in range(datetime.now().year - 5, datetime.now().year + 2)]
+        search_fiscal_year_str = st.selectbox("年度 (検索)", search_fiscal_year_options, key="list_search_fiscal_year")
+        search_fiscal_year = int(search_fiscal_year_str.replace("年度", "")) if search_fiscal_year_str else None
+
+    with col_list_search2:
+        # ナンバー検索はテキスト入力とし、入力がなければ全件対象
+        search_number_str = st.text_input("ナンバー (4桁のみ、検索)", key="list_search_number")
+        search_number = int(search_number_str) if search_number_str.isdigit() and len(search_number_str) == 4 else None
+        if search_number_str and (not search_number_str.isdigit() or len(search_number_str) != 4):
+            st.warning("ナンバーは4桁の数値を入力してください。")
 
 
     query = """
@@ -191,12 +208,12 @@ elif choice == "申請一覧":
     """
     params = []
 
-    if search_staff_name:
-        query += " AND s.name = ?"
-        params.append(search_staff_name)
     if search_fiscal_year:
         query += " AND a.fiscal_year = ?"
         params.append(search_fiscal_year)
+    if search_number is not None: # Noneでない場合のみ条件を追加
+        query += " AND a.number = ?"
+        params.append(search_number)
 
     conn = get_db_connection()
     applications = conn.execute(query, params).fetchall()
