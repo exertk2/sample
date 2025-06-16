@@ -99,22 +99,27 @@ elif choice == "申請入力":
     else:
         with st.form("application_input_form"):
             st.subheader("申請対象の選択（上書き対象の検索にも利用）")
-            selected_staff_name = st.selectbox("職員氏名", staff_names, key="search_staff_name")
+
+            # 申請対象の選択部分を横に並べる
+            col_select1, col_select2, col_select3 = st.columns(3)
+            with col_select1:
+                selected_staff_name = st.selectbox("職員氏名", staff_names, key="search_staff_name")
+            with col_select2:
+                current_year = datetime.now().year
+                fiscal_years = [f"{year}年度" for year in range(current_year - 2, current_year + 3)]
+                selected_fiscal_year_str = st.selectbox("年度", fiscal_years, key="search_fiscal_year")
+                selected_fiscal_year = int(selected_fiscal_year_str.replace("年度", ""))
+            with col_select3:
+                input_number = st.number_input("ナンバー (4桁のみ)", min_value=0, max_value=9999, step=1, key="number_input")
+
 
             # 職員名が選択されていない場合（初期状態など）のハンドリング
             if selected_staff_name:
                 selected_staff_id = staff_options[selected_staff_name]
             else:
-                selected_staff_id = None # またはエラーメッセージ表示など
+                selected_staff_id = None
+                st.info("職員氏名を選択してください。")
                 st.stop() # 職員が選択されていなければ処理を中断
-
-            current_year = datetime.now().year
-            fiscal_years = [f"{year}年度" for year in range(current_year - 2, current_year + 3)]
-            selected_fiscal_year_str = st.selectbox("年度", fiscal_years, key="search_fiscal_year")
-            selected_fiscal_year = int(selected_fiscal_year_str.replace("年度", ""))
-
-            # ナンバー入力
-            input_number = st.number_input("ナンバー (4桁のみ)", min_value=0, max_value=9999, step=1, key="number_input")
 
             # 既存データがあれば、初期値としてフォームにセット
             existing_application = None
@@ -138,17 +143,22 @@ elif choice == "申請入力":
 
 
             st.subheader("入力項目")
-            car_name = st.text_input("車名", value=initial_car_name, key="car_name_input")
-            color = st.text_input("色", value=initial_color, key="color_input")
 
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
+            # 入力項目部分を横に並べる
+            col_input1, col_input2 = st.columns(2)
+            with col_input1:
+                car_name = st.text_input("車名", value=initial_car_name, key="car_name_input")
+            with col_input2:
+                color = st.text_input("色", value=initial_color, key="color_input")
+
+            col_checkbox1, col_checkbox2, col_checkbox3, col_checkbox4 = st.columns(4)
+            with col_checkbox1:
                 unlimited_personal = st.checkbox("対人無制限チェック", value=initial_unlimited_personal, key="unlimited_personal_check")
-            with col2:
+            with col_checkbox2:
                 unlimited_property = st.checkbox("対物無制限チェック", value=initial_unlimited_property, key="unlimited_property_check")
-            with col3:
+            with col_checkbox3:
                 commuting_purpose = st.checkbox("通勤目的チェック", value=initial_commuting_purpose, key="commuting_purpose_check")
-            with col4:
+            with col_checkbox4:
                 purpose_unknown = st.checkbox("目的不明チェック", value=initial_purpose_unknown, key="purpose_unknown_check")
 
 
