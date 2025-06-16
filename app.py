@@ -12,7 +12,7 @@ def get_db_connection():
 
 # データベース初期化
 def init_db():
-    conn = get_db_connection()
+    conn = sqlite3.connect('commute_app.db')
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS staffs (
@@ -172,7 +172,8 @@ elif choice == "申請入力":
             with col_checkbox1:
                 unlimited_personal = st.checkbox("対人無制限チェック", value=initial_unlimited_personal, key="unlimited_personal_check")
             with col_checkbox2:
-                unlimited_property = st.checkbox("対物無制限チェック", value=initial_property_purpose, key="unlimited_property_check")
+                # 修正: initial_property_purpose を initial_unlimited_property に変更
+                unlimited_property = st.checkbox("対物無制限チェック", value=initial_unlimited_property, key="unlimited_property_check")
             with col_checkbox3:
                 commuting_purpose = st.checkbox("通勤目的チェック", value=initial_commuting_purpose, key="commuting_purpose_check")
             with col_checkbox4:
@@ -316,8 +317,8 @@ elif choice == "申請一覧":
         # 表示するカラムを選択・並び替え
         display_columns = [
             'id',
+            '年度',            
             'staff_name',
-            '年度',
             'car_name',
             'color',
             'number',
