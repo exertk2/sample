@@ -30,34 +30,36 @@ def init_db():
     """
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            [span_1](start_span)cursor = conn.cursor()[span_1](end_span)
             # 職員テーブル (staffs)
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS staffs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL UNIQUE
+                    [span_2](start_span)name TEXT NOT NULL UNIQUE[span_2](end_span)
                 )
             ''')
             # 申請テーブル (applications)
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS applications (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    [span_3](start_span)id INTEGER PRIMARY KEY AUTOINCREMENT,[span_3](end_span)
                     staff_id INTEGER NOT NULL,
+                    [span_4](start_span)fiscal_year INTEGER NOT NULL,[span_4](end_span)
+                    vehicle_seq_num INTEGER NOT NULL, -- 新しく追加: 職員と年度ごとの車両連番
                     car_name TEXT,
                     color TEXT,
-                    number TEXT, -- ナンバーをTEXT型に変更し、ゼロ埋めを考慮 (例: '0001')
-                    unlimited_personal BOOLEAN,
-                    unlimited_property BOOLEAN,
-                    commuting_purpose BOOLEAN,
-                    purpose_unknown BOOLEAN,
-                    registration_timestamp DATETIME,
-                    fiscal_year INTEGER,
-                    FOREIGN KEY (staff_id) REFERENCES staffs (id)
+                    [span_5](start_span)number TEXT, -- ナンバーをTEXT型に変更し、ゼロ埋めを考慮 (例: '0001')[span_5](end_span)
+                    [span_6](start_span)unlimited_personal BOOLEAN,[span_6](end_span)
+                    [span_7](start_span)unlimited_property BOOLEAN,[span_7](end_span)
+                    [span_8](start_span)commuting_purpose BOOLEAN,[span_8](end_span)
+                    [span_9](start_span)purpose_unknown BOOLEAN,[span_9](end_span)
+                    [span_10](start_span)registration_timestamp DATETIME,[span_10](end_span)
+                    FOREIGN KEY (staff_id) REFERENCES staffs (id),
+                    UNIQUE (staff_id, fiscal_year, vehicle_seq_num) -- ユニーク制約を変更
                 )
             ''')
             conn.commit()
     except sqlite3.Error as e:
-        st.error(f"データベースの初期化中にエラーが発生しました: {e}")
+        [span_11](start_span)st.error(f"データベースの初期化中にエラーが発生しました: {e}")[span_11](end_span)
         st.info("アプリケーションを再起動してみてください。")
 
 def get_all_staffs():
@@ -68,10 +70,10 @@ def get_all_staffs():
     try:
         with get_db_connection() as conn:
             # 名前でソートして表示順を改善
-            staffs = conn.execute("SELECT id, name FROM staffs ORDER BY name ASC").fetchall() 
+            staffs = conn.execute("SELECT id, name FROM staffs ORDER BY name ASC").fetchall()
             return staffs
     except sqlite3.Error as e:
-        st.error(f"職員情報の取得中にエラーが発生しました: {e}")
+        [span_12](start_span)st.error(f"職員情報の取得中にエラーが発生しました: {e}")[span_12](end_span)
         return []
 
 def add_staff(name):
@@ -84,21 +86,53 @@ def add_staff(name):
             conn.execute("INSERT INTO staffs (name) VALUES (?)", (name,))
             conn.commit()
             st.success(f"職員「**{name}**」を登録しました。")
-            st.rerun() # 登録後にUIを更新し、リストを最新状態にする
+            [span_13](start_span)st.rerun()[span_13](end_span) # 登録後にUIを更新し、リストを最新状態にする
     except sqlite3.IntegrityError:
-        st.error(f"職員名「**{name}**」は既に登録されています。別の名前を試してください。")
+        st.error(f"職員名「**{name}」は既に登録されています。別の名前を試してください。")
     except sqlite3.Error as e:
         st.error(f"職員登録中に予期せぬエラーが発生しました: {e}")
 
-def find_application(staff_id, fiscal_year, number):
+def _get_next_vehicle_seq_num(staff_id, fiscal_year):
     """
-    指定された職員ID、年度、ナンバーに一致する申請データを検索します。
+    指定された職員と年度の次の車両連番を取得します。
+    既存の車両がない場合は1を返します。
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT MAX(vehicle_seq_num) FROM applications WHERE staff_id = ? AND fiscal_year = ?",
+                (staff_id, fiscal_year)
+            )
+            max_seq_num = cursor.fetchone()[0]
+            return (max_seq_num or 0) + 1
+    except sqlite3.Error as e:
+        st.error(f"次の車両連番の取得中にエラーが発生しました: {e}")
+        return 1 # エラー時はデフォルトで1を返すか、適切なエラーハンドリングを行う
+
+def find_applications_by_staff_and_year(staff_id, fiscal_year):
+    """
+    指定された職員IDと年度に一致する全ての申請データを検索します。
+    見つからない場合は空のリストを返します。
+    """
+    try:
+        with get_db_connection() as conn:
+            query = "SELECT * FROM applications WHERE staff_id = ? AND fiscal_year = ? ORDER BY vehicle_seq_num ASC"
+            applications = conn.execute(query, (staff_id, fiscal_year)).fetchall()
+            return applications
+    except sqlite3.Error as e:
+        st.error(f"申請データの検索中にエラーが発生しました: {e}")
+        return []
+
+def find_application_by_seq_num(staff_id, fiscal_year, vehicle_seq_num):
+    """
+    指定された職員ID、年度、車両連番に一致する申請データを検索します。
     見つからない場合はNoneを返します。
     """
     try:
         with get_db_connection() as conn:
-            query = "SELECT * FROM applications WHERE staff_id = ? AND fiscal_year = ? AND number = ?"
-            application = conn.execute(query, (staff_id, fiscal_year, number)).fetchone()
+            query = "SELECT * FROM applications WHERE staff_id = ? AND fiscal_year = ? AND vehicle_seq_num = ?"
+            application = conn.execute(query, (staff_id, fiscal_year, vehicle_seq_num)).fetchone()
             return application
     except sqlite3.Error as e:
         st.error(f"申請データの検索中にエラーが発生しました: {e}")
@@ -111,34 +145,34 @@ def upsert_application(data, is_update):
     """
     try:
         with get_db_connection() as conn:
-            if is_update:
+            [span_14](start_span)if is_update:[span_14](end_span)
                 query = """
                     UPDATE applications
-                    SET car_name = ?, color = ?, unlimited_personal = ?, unlimited_property = ?,
-                        commuting_purpose = ?, purpose_unknown = ?, registration_timestamp = ?
-                    WHERE staff_id = ? AND fiscal_year = ? AND number = ?
+                    [span_15](start_span)SET car_name = ?, color = ?, number = ?, unlimited_personal = ?, unlimited_property = ?,[span_15](end_span)
+                    commuting_purpose = ?, purpose_unknown = ?, registration_timestamp = ?
+                    WHERE staff_id = ? AND fiscal_year = ? AND vehicle_seq_num = ?
                 """
                 params = (
-                    data['car_name'], data['color'], data['unlimited_personal'], data['unlimited_property'],
+                    data['car_name'], data['color'], data['number'], data['unlimited_personal'], data['unlimited_property'],
                     data['commuting_purpose'], data['purpose_unknown'], data['timestamp'],
-                    data['staff_id'], data['fiscal_year'], data['number']
-                )
+                    data['staff_id'], data['fiscal_year'], data['vehicle_seq_num']
+                [span_16](start_span))
                 conn.execute(query, params)
-                st.success("選択されたナンバーの申請情報を**修正**しました。")
+                st.success(f"職員「{data['staff_name']}」の「{data['fiscal_year']}年度 第{data['vehicle_seq_num']}車両」の申請情報を**修正**しました。")
             else:
                 query = """
-                    INSERT INTO applications 
-                    (staff_id, car_name, color, number, unlimited_personal, unlimited_property, 
-                     commuting_purpose, purpose_unknown, registration_timestamp, fiscal_year) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """
+                    INSERT INTO applications
+                    (staff_id, fiscal_year, vehicle_seq_num, car_name, color, number, unlimited_personal, unlimited_property,
+                     commuting_purpose, purpose_unknown, registration_timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """[span_16](end_span)
                 params = (
-                    data['staff_id'], data['car_name'], data['color'], data['number'], 
-                    data['unlimited_personal'], data['unlimited_property'], data['commuting_purpose'], 
-                    data['purpose_unknown'], data['timestamp'], data['fiscal_year']
-                )
-                conn.execute(query, params)
-                st.success("新しい申請情報を**登録**しました。")
+                    data['staff_id'], data['fiscal_year'], data['vehicle_seq_num'], data['car_name'], data['color'], data['number'],
+                    data['unlimited_personal'], data['unlimited_property'], data['commuting_purpose'],
+                    data['purpose_unknown'], data['timestamp']
+                [span_17](start_span))
+                conn.execute(query, params)[span_17](end_span)
+                st.success(f"職員「{data['staff_name']}」の「{data['fiscal_year']}年度 第{data['vehicle_seq_num']}車両」として新しい申請情報を**登録**しました。")
             conn.commit()
             st.rerun() # 登録/修正後にUIを更新
     except sqlite3.Error as e:
@@ -151,24 +185,24 @@ def search_applications(fiscal_year=None, number=None):
     ナンバーは部分一致検索をサポートします。
     """
     try:
-        with get_db_connection() as conn:
+        [span_18](start_span)with get_db_connection() as conn:[span_18](end_span)
             query = """
-                SELECT a.id, s.name AS staff_name, a.car_name, a.color, a.number,
+                SELECT a.id, s.name AS staff_name, a.car_name, a.color, a.number, a.vehicle_seq_num,
                        a.unlimited_personal, a.unlimited_property, a.commuting_purpose,
                        a.purpose_unknown, a.registration_timestamp, a.fiscal_year
-                FROM applications a JOIN staffs s ON a.staff_id = s.id
+                [span_19](start_span)FROM applications a JOIN staffs s ON a.staff_id = s.id[span_19](end_span)
                 WHERE 1=1
             """
             params = []
             if fiscal_year:
-                query += " AND a.fiscal_year = ?"
-                params.append(fiscal_year)
+                [span_20](start_span)query += " AND a.fiscal_year = ?"[span_20](end_span)
+                [span_21](start_span)params.append(fiscal_year)[span_21](end_span)
             if number: # ナンバーが空文字やNoneでない場合
                 # 部分一致検索
                 query += " AND a.number LIKE ?"
-                params.append(f"%{number}%") 
+                params.append(f"%{number}%")
             
-            query += " ORDER BY a.registration_timestamp DESC"
+            [span_22](start_span)query += " ORDER BY a.registration_timestamp DESC"[span_22](end_span)
             return conn.execute(query, params).fetchall()
     except sqlite3.Error as e:
         st.error(f"申請一覧の検索中にエラーが発生しました: {e}")
@@ -192,7 +226,7 @@ def get_current_fiscal_year():
 
 def show_staff_registration_page():
     """
-    職員登録ページのUIを表示します。
+    [span_23](start_span)職員登録ページのUIを表示します。[span_23](end_span)
     """
     st.header("👤 職員登録")
     st.markdown("新しい職員の氏名を登録します。登録された職員は申請時に選択できるようになります。")
@@ -205,7 +239,7 @@ def show_staff_registration_page():
         if submitted:
             if staff_name:
                 add_staff(staff_name)
-            else:
+            [span_24](start_span)else:[span_24](end_span)
                 st.warning("氏名を入力してください。")
 
     st.subheader("📚 登録済職員一覧")
@@ -222,11 +256,11 @@ def show_staff_registration_page():
 
 def show_application_input_page():
     """
-    申請入力ページのUIを表示します。
+    [span_25](start_span)申請入力ページのUIを表示します。[span_25](end_span)
     既存の申請があればそのデータを読み込み、なければ新規入力として扱います。
     """
     st.header("📝 申請入力")
-    st.markdown("車両の申請情報を入力または修正します。職員、年度、ナンバーの組み合わせで既存の申請を検索し、上書きすることが可能です。")
+    st.markdown("車両の申請情報を入力または修正します。職員、年度、第●車両の組み合わせで既存の申請を検索し、上書きすることが可能です。")
     st.markdown("---")
 
     staffs = get_all_staffs()
@@ -240,21 +274,24 @@ def show_application_input_page():
 
     # Streamlitのセッションステートでフォームの入力値を保持し、UIの再レンダリング時に値を維持
     if 'selected_staff_name' not in st.session_state:
-        st.session_state.selected_staff_name = staff_names[0] if staff_names else ""
+        [span_26](start_span)st.session_state.selected_staff_name = staff_names[0] if staff_names else ""[span_26](end_span)
     if 'selected_fiscal_year' not in st.session_state:
-        st.session_state.selected_fiscal_year = get_current_fiscal_year()
+        [span_27](start_span)st.session_state.selected_fiscal_year = get_current_fiscal_year()[span_27](end_span)
+    if 'selected_vehicle_seq_num' not in st.session_state:
+        st.session_state.selected_vehicle_seq_num = "新規登録"
     if 'input_number_str' not in st.session_state: # `input_number_str`で元の文字列を保持
-        st.session_state.input_number_str = ""
+        [span_28](start_span)st.session_state.input_number_str = ""[span_28](end_span)
+
 
     with st.form("application_input_form", clear_on_submit=False):
-        st.subheader("1. 申請対象の選択（既存データの検索・上書き）")
+        [span_29](start_span)st.subheader("1. 申請対象の選択（既存データの検索・上書き）")[span_29](end_span)
 
         col1, col2, col3 = st.columns(3)
         with col1:
             selected_staff_name = st.selectbox(
-                "職員氏名", 
-                staff_names, 
-                index=staff_names.index(st.session_state.selected_staff_name) if st.session_state.selected_staff_name in staff_names else 0,
+                "職員氏名",
+                staff_names,
+                [span_30](start_span)index=staff_names.index(st.session_state.selected_staff_name) if st.session_state.selected_staff_name in staff_names else 0,[span_30](end_span)
                 key="staff_name_select",
                 help="申請を行う職員を選択してください。"
             )
@@ -262,78 +299,94 @@ def show_application_input_page():
             st.session_state.selected_staff_name = selected_staff_name
         
         with col2:
-            current_fiscal_year = get_current_fiscal_year()
+            [span_31](start_span)current_fiscal_year = get_current_fiscal_year()[span_31](end_span)
             # 現在の年度から前後数年間のオプションを生成
             fiscal_year_options = [f"{y}年度" for y in range(current_fiscal_year - 2, current_fiscal_year + 3)]
             default_fy_index = fiscal_year_options.index(f"{st.session_state.selected_fiscal_year}年度") if f"{st.session_state.selected_fiscal_year}年度" in fiscal_year_options else (fiscal_year_options.index(f"{current_fiscal_year}年度") if f"{current_fiscal_year}年度" in fiscal_year_options else 0)
             selected_fiscal_year_str = st.selectbox(
-                "年度", 
-                fiscal_year_options, 
-                index=default_fy_index, 
+                "年度",
+                [span_32](start_span)fiscal_year_options,[span_32](end_span)
+                index=default_fy_index,
                 key="fiscal_year_select",
                 help="申請対象の年度を選択してください。"
             )
             selected_fiscal_year = int(selected_fiscal_year_str.replace("年度", ""))
             # 選択された年度をセッションステートに保存
-            st.session_state.selected_fiscal_year = selected_fiscal_year
-            
-        with col3:
-            # ナンバーは4桁の文字列として入力、初期値はセッションステートから
-            input_number_str = st.text_input(
-                "ナンバー (4桁の数字)", 
-                value=st.session_state.input_number_str, # 元の入力文字列を保持
-                key="number_input",
-                max_chars=4, # 4文字までに制限
-                help="車両のナンバープレートの4桁の数字を入力してください。例: 1234"
-            )
-            # 常に4桁表示にするための整形 (内部処理用、表示は元の文字列)
-            # input_number_strが数字でなければそのまま、数字なら4桁ゼロ埋め
-            processed_number = input_number_str.zfill(4) if input_number_str.isdigit() else input_number_str
-            
-            # 入力されたナンバー文字列をセッションステートに保存
-            st.session_state.input_number_str = input_number_str
+            [span_33](start_span)st.session_state.selected_fiscal_year = selected_fiscal_year[span_33](end_span)
 
-        # 既存データの検索と初期値設定
         selected_staff_id = staff_options.get(selected_staff_name)
-        existing_app = None
-        is_update_mode = False
 
-        # ナンバーが有効な4桁の数字で、職員と年度が選択されている場合のみ検索
-        if selected_staff_id and processed_number.isdigit() and len(processed_number) == 4:
-            existing_app = find_application(selected_staff_id, selected_fiscal_year, processed_number)
-            if existing_app:
-                st.info(f"この職員、年度、ナンバーの組み合わせで**既存の申請情報が見つかりました**。以下のフォームにはその情報が自動入力されています。修正して「登録 / 修正」ボタンを押してください。")
-                is_update_mode = True
+        # 職員と年度が選択されたら、その組み合わせの既存車両を取得
+        existing_vehicles_for_staff_year = []
+        if selected_staff_id and selected_fiscal_year:
+            existing_apps = find_applications_by_staff_and_year(selected_staff_id, selected_fiscal_year)
+            existing_vehicles_for_staff_year = [f"第{app['vehicle_seq_num']}車両" for app in existing_apps]
+
+        # 新規登録オプションを追加
+        vehicle_seq_num_options = ["新規登録"] + existing_vehicles_for_staff_year
+
+        with col3:
+            selected_vehicle_seq_num_str = st.selectbox(
+                "車両選択",
+                vehicle_seq_num_options,
+                index=vehicle_seq_num_options.index(st.session_state.selected_vehicle_seq_num) if st.session_state.selected_vehicle_seq_num in vehicle_seq_num_options else 0,
+                key="vehicle_seq_num_select",
+                help="既存の車両を選択して修正するか、新規登録を選択してください。"
+            )
+            st.session_state.selected_vehicle_seq_num = selected_vehicle_seq_num_str
+
+        is_update_mode = False
+        existing_app_data = None
+        current_vehicle_seq_num = None
+
+        if selected_vehicle_seq_num_str != "新規登録":
+            is_update_mode = True
+            current_vehicle_seq_num = int(selected_vehicle_seq_num_str.replace("第", "").replace("車両", ""))
+            existing_app_data = find_application_by_seq_num(selected_staff_id, selected_fiscal_year, current_vehicle_seq_num)
+            if existing_app_data:
+                st.info(f"この職員、年度、車両の組み合わせで**既存の申請情報が見つかりました**。以下のフォームにはその情報が自動入力されています。修正して「登録 / 修正」ボタンを押してください。")
             else:
-                st.info("この組み合わせでは既存の申請情報は見つかりませんでした。新規登録として入力してください。")
-        elif selected_staff_id and input_number_str and (not input_number_str.isdigit() or len(input_number_str) != 4):
-             st.warning("ナンバーは正確に4桁の数字で入力してください。")
-        elif selected_staff_id and not input_number_str:
-            # ナンバー未入力の場合
-            st.info("ナンバーを入力すると、既存の申請を検索できます。")
+                st.warning("選択された車両情報が見つかりませんでした。")
+        else:
+            # 新規登録モードの場合、次の連番を決定
+            current_vehicle_seq_num = _get_next_vehicle_seq_num(selected_staff_id, selected_fiscal_year)
+            st.info(f"新規登録モードです。この申請は「第{current_vehicle_seq_num}車両」として登録されます。")
 
 
         # 初期値の辞書を作成
-        # 既存の申請があればその値、なければデフォルト値を使用
         initial_values = {
-            'car_name': existing_app['car_name'] if existing_app else "",
-            'color': existing_app['color'] if existing_app else "",
-            'unlimited_personal': existing_app['unlimited_personal'] if existing_app else False,
-            'unlimited_property': existing_app['unlimited_property'] if existing_app else False,
-            'commuting_purpose': existing_app['commuting_purpose'] if existing_app else False,
-            'purpose_unknown': existing_app['purpose_unknown'] if existing_app else False,
+            [span_34](start_span)'car_name': existing_app_data['car_name'] if existing_app_data else "",[span_34](end_span)
+            [span_35](start_span)'color': existing_app_data['color'] if existing_app_data else "",[span_35](end_span)
+            'number': existing_app_data['number'] if existing_app_data else "",
+            [span_36](start_span)'unlimited_personal': existing_app_data['unlimited_personal'] if existing_app_data else False,[span_36](end_span)
+            [span_37](start_span)'unlimited_property': existing_app_data['unlimited_property'] if existing_app_data else False,[span_37](end_span)
+            [span_38](start_span)'commuting_purpose': existing_app_data['commuting_purpose'] if existing_app_data else False,[span_38](end_span)
+            [span_39](start_span)'purpose_unknown': existing_app_data['purpose_unknown'] if existing_app_data else False,[span_39](end_span)
         }
 
-        st.subheader("2. 車両情報・保険情報の入力")
+        [span_40](start_span)st.subheader("2. 車両情報・保険情報の入力")[span_40](end_span)
 
         col_input1, col_input2 = st.columns(2)
         with col_input1:
             car_name = st.text_input("車名", value=initial_values['car_name'], help="車両のメーカー名と車種名を入力してください。例: トヨタ プリウス").strip()
         with col_input2:
             color = st.text_input("色", value=initial_values['color'], help="車両の代表的な色を入力してください。例: 白、黒、シルバー").strip()
-        
+
+        # ナンバー入力は引き続き必要だが、検索キーからは外れる
+        input_number_str = st.text_input(
+            "ナンバー (4桁の数字)",
+            value=initial_values['number'], # ここもinitial_valuesから設定
+            [span_41](start_span)key="number_input",[span_41](end_span)
+            max_chars=4, # 4文字までに制限
+            help="車両のナンバープレートの4桁の数字を入力してください。例: 1234"
+        )
+        # 常に4桁表示にするための整形 (内部処理用、表示は元の文字列)
+        processed_number = input_number_str.zfill(4) if input_number_str.isdigit() else input_number_str
+        st.session_state.input_number_str = input_number_str # セッションステートに元の入力文字列を保存
+
+
         st.markdown("---")
-        st.subheader("3. 保険・目的情報のチェック")
+        [span_42](start_span)st.subheader("3. 保険・目的情報のチェック")[span_42](end_span)
 
         col_check1, col_check2, col_check3, col_check4 = st.columns(4)
         with col_check1:
@@ -343,7 +396,7 @@ def show_application_input_page():
         with col_check3:
             commuting_purpose = st.checkbox("通勤目的", value=initial_values['commuting_purpose'], help="主に通勤のために車両を使用する場合にチェックしてください。")
         with col_check4:
-            purpose_unknown = st.checkbox("目的不明", value=initial_values['purpose_unknown'], help="車両の使用目的が不明確な場合にチェックしてください。")
+            [span_43](start_span)purpose_unknown = st.checkbox("目的不明", value=initial_values['purpose_unknown'], help="車両の使用目的が不明確な場合にチェックしてください。")[span_43](end_span)
 
         st.markdown("---")
         submitted = st.form_submit_button("登録 / 修正")
@@ -353,7 +406,7 @@ def show_application_input_page():
             if not selected_staff_name:
                 st.error("職員氏名を選択してください。")
             elif not car_name:
-                st.error("車名を入力してください。")
+                [span_44](start_span)st.error("車名を入力してください。")[span_44](end_span)
             elif not color:
                 st.error("色を入力してください。")
             elif not (processed_number.isdigit() and len(processed_number) == 4):
@@ -361,152 +414,20 @@ def show_application_input_page():
             else:
                 application_data = {
                     'staff_id': selected_staff_id,
+                    'staff_name': selected_staff_name, # 成功メッセージ用に職員名も渡す
                     'fiscal_year': selected_fiscal_year,
-                    'number': processed_number, # 整形済みの4桁ナンバーを使用
-                    'car_name': car_name,
-                    'color': color,
-                    'unlimited_personal': unlimited_personal,
-                    'unlimited_property': unlimited_property,
-                    'commuting_purpose': commuting_purpose,
-                    'purpose_unknown': purpose_unknown,
-                    'timestamp': datetime.now(JST)
+                    'vehicle_seq_num': current_vehicle_seq_num, # 連番を使用
+                    [span_45](start_span)'number': processed_number, # 整形済みの4桁ナンバーを使用[span_45](end_span)
+                    [span_46](start_span)'car_name': car_name,[span_46](end_span)
+                    [span_47](start_span)'color': color,[span_47](end_span)
+                    [span_48](start_span)'unlimited_personal': unlimited_personal,[span_48](end_span)
+                    [span_49](start_span)'unlimited_property': unlimited_property,[span_49](end_span)
+                    [span_50](start_span)'commuting_purpose': commuting_purpose,[span_50](end_span)
+                    [span_51](start_span)'purpose_unknown': purpose_unknown,[span_51](end_span)
+                    [span_52](start_span)'timestamp': datetime.now(JST)[span_52](end_span)
                 }
                 # 新規登録か更新かを判断して処理を実行
                 upsert_application(application_data, is_update=is_update_mode)
 
-def show_application_list_page():
-    """
-    申請一覧ページのUIを表示します。
-    検索条件（年度、ナンバー）でフィルタリングして表示できます。
-    """
-    st.header("📊 申請一覧")
-    st.markdown("登録されている全ての申請情報、または検索条件に合致する申請情報を表示します。")
-    st.markdown("---")
 
-    st.subheader("検索条件")
-
-    col_search1, col_search2 = st.columns(2)
-    with col_search1:
-        current_fiscal_year = get_current_fiscal_year()
-        # 検索年度のオプションには「すべて」を追加
-        fy_options = ["すべて"] + [f"{y}年度" for y in range(current_fiscal_year - 5, current_fiscal_year + 2)]
-        
-        # セッションステートで選択状態を保持
-        if 'search_fiscal_year_selected' not in st.session_state:
-            st.session_state.search_fiscal_year_selected = f"{current_fiscal_year}年度"
-        
-        search_fy_str = st.selectbox(
-            "年度", 
-            fy_options, 
-            index=fy_options.index(st.session_state.search_fiscal_year_selected) if st.session_state.search_fiscal_year_selected in fy_options else 0, 
-            key="list_search_fy",
-            help="表示する申請の年度を絞り込みます。「すべて」を選択すると全年度の申請を表示します。"
-        )
-        # 選択された年度をセッションステートに保存
-        st.session_state.search_fiscal_year_selected = search_fy_str 
-        search_fiscal_year = int(search_fy_str.replace("年度", "")) if search_fy_str != "すべて" else None
-    
-    with col_search2:
-        # セッションステートで選択状態を保持
-        if 'search_number_input' not in st.session_state:
-            st.session_state.search_number_input = ""
-        
-        search_number_input = st.text_input(
-            "ナンバー (部分一致検索)", 
-            value=st.session_state.search_number_input, 
-            key="list_search_number",
-            help="ナンバーの一部または全部を入力して検索します。例: '12' で '0012' や '1234' を検索。"
-        ).strip() # 前後の空白を削除
-        # 入力値をセッションステートに保存
-        st.session_state.search_number_input = search_number_input 
-        search_number = search_number_input if search_number_input else None 
-
-    st.markdown("---")
-    st.subheader("検索結果")
-
-    # 検索実行
-    applications = search_applications(fiscal_year=search_fiscal_year, number=search_number)
-
-    if applications:
-        st.write(f"🔍 **{len(applications)}** 件の申請が見つかりました。")
-        df = pd.DataFrame([dict(row) for row in applications])
-
-        # 表示用にデータを加工
-        # Boolean値をチェックマークに変換
-        df['対人無制限'] = df['unlimited_personal'].apply(lambda x: '✔' if x else '')
-        df['対物無制限'] = df['unlimited_property'].apply(lambda x: '✔' if x else '')
-        df['通勤目的'] = df['commuting_purpose'].apply(lambda x: '✔' if x else '')
-        df['目的不明'] = df['purpose_unknown'].apply(lambda x: '✔' if x else '')
-        
-        # 年度と登録日時のフォーマット
-        df['年度'] = df['fiscal_year'].astype(str) + '年度'
-        df['登録日時'] = pd.to_datetime(df['registration_timestamp']).dt.strftime('%Y-%m-%d %H:%M:%S')
-
-        # 表示するカラムの選択とリネーム
-        df_display = df.rename(columns={
-            'id': 'ID', 
-            'staff_name': '職員氏名', 
-            'car_name': '車名', 
-            'color': '色', 
-            'number': 'ナンバー'
-        })
-        
-        display_columns = [
-            'ID', '年度', '職員氏名', '車名', '色', 'ナンバー', '対人無制限', 
-            '対物無制限', '通勤目的', '目的不明', '登録日時'
-        ]
-        
-        # Streamlit dataframe with increased height for better view
-        st.dataframe(df_display[display_columns], hide_index=True, height=500) # 高さ調整
-    else:
-        st.info("該当する申請はありません。検索条件を変更して再度お試しください。")
-    st.markdown("---")
-
-# ==============================================================================
-# メイン処理 (Main Application Logic)
-# ==============================================================================
-
-def main():
-    """
-    アプリケーションのメインエントリポイント
-    サイドバーでページを切り替えます。
-    """
-    st.set_page_config(layout="wide", page_title="通勤車両管理アプリ", page_icon="🚗")
-    init_db()  # アプリケーション起動時にDBを初期化
-
-    st.sidebar.title("🚗 通勤車両管理アプリ")
-    st.sidebar.markdown("車両の申請情報と職員を管理するシンプルなアプリケーションです。")
-    
-    # セッションステートで現在の選択メニューを管理
-    if 'current_menu' not in st.session_state:
-        st.session_state.current_menu = "申請入力"
-
-    menu_options = {
-        "申請入力": "📝 申請入力",
-        "申請一覧": "📊 申請一覧",
-        "職員登録": "👤 職員登録"
-    }
-    
-    choice = st.sidebar.radio(
-        "メニュー", 
-        list(menu_options.values()),
-        index=list(menu_options.values()).index(menu_options[st.session_state.current_menu]),
-        key="main_menu_selector"
-    )
-
-    # 選択されたメニューのキーを取得
-    selected_key = next(key for key, value in menu_options.items() if value == choice)
-    st.session_state.current_menu = selected_key
-
-    page_functions = {
-        "申請入力": show_application_input_page,
-        "申請一覧": show_application_list_page,
-        "職員登録": show_staff_registration_page,
-    }
-    
-    # 選択されたメニューに応じた関数を実行
-    page_functions[st.session_state.current_menu]()
-
-
-if __name__ == "__main__":
-    main()
+def show_applicat
