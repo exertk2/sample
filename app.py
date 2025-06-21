@@ -158,7 +158,7 @@ with col_input_button:
 
 
 with col_output:
-    st.markdown("**変換後のテキスト (テキスト内右上の□2つ重なったボタンをクリックするとコピー完了)**")
+    st.markdown("**変換後のテキスト (枠内右上□2つ重なったアイコンクリックでコピー)**")
     # Session Stateから結果を取得して表示
     if 'final_processed_text' in st.session_state and st.session_state['final_processed_text']:
         st.code(st.session_state['final_processed_text'], language="text", height=300)
