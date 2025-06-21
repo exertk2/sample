@@ -158,28 +158,9 @@ with col_input_button:
 
 
 with col_output:
-    st.markdown("**変換後のテキスト (整形済み)**")
+    st.markdown("**変換後のテキスト (テキスト内右上の□2つ重なったボタンをクリックするとコピー完了)**")
     # Session Stateから結果を取得して表示
     if 'final_processed_text' in st.session_state and st.session_state['final_processed_text']:
         st.code(st.session_state['final_processed_text'], language="text", height=300)
     else:
         st.code("ここに変換結果が表示されます。", language="text", height=300)
-
-    # 変換後テキストをクリップボードにコピーするボタン
-    if 'final_processed_text' in st.session_state and st.session_state['final_processed_text']:
-        st.markdown("---") # 区切り線
-        st.subheader("変換後テキストをクリップボードにコピー")
-
-        # コピー対象のテキストを格納する隠しtextareaのIDを生成
-        copy_target_id = str(uuid.uuid4())
-
-        # JavaScriptでクリップボードにコピーするボタンと隠しtextareaを配置
-        st.markdown(f"""
-            <textarea id="{copy_target_id}" style="position: absolute; left: -9999px;">{st.session_state['final_processed_text']}</textarea>
-            <button onclick="
-                var copyText = document.getElementById('{copy_target_id}');
-                copyText.select();
-                document.execCommand('copy');
-                alert('テキストがコピーされました！');
-            ">変換結果をコピー</button>
-        """, unsafe_allow_html=True)
