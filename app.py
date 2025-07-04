@@ -82,6 +82,7 @@ def create_tables():
             health_notes TEXT,
             memo1 TEXT,
             memo2 TEXT,
+            log_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, -- 日誌のタイムスタンプを追加
             UNIQUE(user_id, log_date),
             FOREIGN KEY (user_id) REFERENCES users (id),
             FOREIGN KEY (medication_staff_id) REFERENCES staff (id),
@@ -101,6 +102,7 @@ def create_tables():
             staff1_id INTEGER,
             staff2_id INTEGER,
             notes TEXT,
+            excretion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, -- 排泄のタイムスタンプを追加
             FOREIGN KEY (log_id) REFERENCES daily_logs (id),
             FOREIGN KEY (staff1_id) REFERENCES staff (id),
             FOREIGN KEY (staff2_id) REFERENCES staff (id)
@@ -145,6 +147,7 @@ def create_tables():
             support_date_next_visit DATE,
             support_checked_other BOOLEAN DEFAULT 0,
             support_content_other TEXT,
+            absence_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, -- 欠席のタイムスタンプを追加
             FOREIGN KEY (user_id) REFERENCES users (id),
             FOREIGN KEY (reception_staff_id) REFERENCES staff (id)
         )
@@ -417,6 +420,45 @@ def show_log_list_page():
     # 利用曜日に基づいて利用者をフィルタリング
     query = f"SELECT user_code, name FROM users WHERE is_active = 1 AND use_days LIKE '%{selected_weekday}%' ORDER BY kana"
     today_users = conn.execute(query).fetchall()
+
+    # 各利用者の日誌、排泄、欠席の最新タイムスタンプを取得
+    log_timestamps = {}
+    excretion_timestamps = {}
+    absence_timestamps = {}
+
+    for user in today_users:
+        user_id = user["user_code"]
+        log_date_str = log_date.strftime('%Y-%m-%d')
+
+        # 日誌の最終更新日時を取得
+        log_entry = conn.execute(
+            'SELECT log_timestamp FROM daily_logs WHERE user_id = ? AND log_date = ?',
+            (user_id, log_date_str)
+        ).fetchone()
+        if log_entry and log_entry['log_timestamp']:
+            log_timestamps[user_id] = datetime.strptime(log_entry['log_timestamp'], '%Y-%m-%d %H:%M:%S').strftime('%H:%M')
+
+        # 排泄の最終登録日時を取得
+        excretion_entry = conn.execute(
+            '''SELECT MAX(e.excretion_timestamp) AS latest_excretion_timestamp
+               FROM excretions e
+               JOIN daily_logs dl ON e.log_id = dl.id
+               WHERE dl.user_id = ? AND dl.log_date = ?''',
+            (user_id, log_date_str)
+        ).fetchone()
+        if excretion_entry and excretion_entry['latest_excretion_timestamp']:
+            excretion_timestamps[user_id] = datetime.strptime(excretion_entry['latest_excretion_timestamp'], '%Y-%m-%d %H:%M:%S').strftime('%H:%M')
+
+        # 欠席の最終登録日時を取得
+        absence_entry = conn.execute(
+            '''SELECT MAX(absence_timestamp) AS latest_absence_timestamp
+               FROM absences
+               WHERE user_id = ? AND absence_start_date <= ? AND absence_end_date >= ?''',
+            (user_id, log_date_str, log_date_str)
+        ).fetchone()
+        if absence_entry and absence_entry['latest_absence_timestamp']:
+            absence_timestamps[user_id] = datetime.strptime(absence_entry['latest_absence_timestamp'], '%Y-%m-%d %H:%M:%S').strftime('%H:%M')
+
     conn.close()
 
     st.write("---")
@@ -427,7 +469,8 @@ def show_log_list_page():
         st.write(f"##### {len(today_users)}名の利用予定者")
 
         # Create columns for display and buttons
-        cols = st.columns([0.5, 0.2, 0.1, 0.1, 0.1])
+        # Adjusted column widths to accommodate timestamp
+        cols = st.columns([0.3, 0.2, 0.2, 0.2]) # Name, Log (Button + Time), Excretion (Button + Time), Absence (Button + Time)
         with cols[0]:
             st.write("**氏名**")
         with cols[1]:
@@ -442,31 +485,43 @@ def show_log_list_page():
             user_name = user["name"]
 
             # Use separate columns for each row's elements
-            col_name, col_log, col_excretion, col_absence = st.columns([0.5, 0.2, 0.1, 0.1])
+            col_name, col_log, col_excretion, col_absence = st.columns([0.3, 0.2, 0.2, 0.2])
 
             with col_name:
                 st.write(user_name)
 
-            # Daily Log button
-            if col_log.button("✏️", key=f"log_button_{user_id}"): # Added key suffix
-                st.session_state.page = "日誌入力"
-                st.session_state.selected_user_id_for_log = user_id
-                st.session_state.selected_log_date = log_date
-                st.rerun()
+            # Daily Log button and timestamp
+            with col_log:
+                log_col1, log_col2 = st.columns([0.4, 0.6])
+                if log_col1.button("✏️", key=f"log_button_{user_id}"): # Added key suffix
+                    st.session_state.page = "日誌入力"
+                    st.session_state.selected_user_id_for_log = user_id
+                    st.session_state.selected_log_date = log_date
+                    st.rerun()
+                if user_id in log_timestamps:
+                    log_col2.write(f"({log_timestamps[user_id]})")
 
-            # Excretion button
-            if col_excretion.button("🚽", key=f"excretion_button_{user_id}"): # Added key suffix
-                st.session_state.page = "排泄入力"
-                st.session_state.selected_user_id_for_excretion = user_id
-                st.session_state.selected_log_date = log_date
-                st.rerun()
+            # Excretion button and timestamp
+            with col_excretion:
+                excretion_col1, excretion_col2 = st.columns([0.4, 0.6])
+                if excretion_col1.button("🚽", key=f"excretion_button_{user_id}"): # Added key suffix
+                    st.session_state.page = "排泄入力"
+                    st.session_state.selected_user_id_for_excretion = user_id
+                    st.session_state.selected_log_date = log_date
+                    st.rerun()
+                if user_id in excretion_timestamps:
+                    excretion_col2.write(f"({excretion_timestamps[user_id]})")
 
-            # Absence button
-            if col_absence.button("❌", key=f"absence_button_{user_id}"): # Added key suffix
-                st.session_state.page = "欠席入力"
-                st.session_state.selected_user_id_for_absence = user_id
-                st.session_state.selected_log_date = log_date
-                st.rerun()
+            # Absence button and timestamp
+            with col_absence:
+                absence_col1, absence_col2 = st.columns([0.4, 0.6])
+                if absence_col1.button("❌", key=f"absence_button_{user_id}"): # Added key suffix
+                    st.session_state.page = "欠席入力"
+                    st.session_state.selected_user_id_for_absence = user_id
+                    st.session_state.selected_log_date = log_date
+                    st.rerun()
+                if user_id in absence_timestamps:
+                    absence_col2.write(f"({absence_timestamps[user_id]})")
 
     st.write("---")
     with st.expander("臨時利用者の追加"):
@@ -686,7 +741,8 @@ def show_log_input_page():
                     SET is_absent=?, temperature=?, pulse=?, spo2=?, bp_high=?, bp_low=?,
                         medication_check=?, medication_staff_id=?, bath_check=?, bath_start_time=?,
                         bath_start_staff_id=?, bath_end_time=?, bath_end_staff_id=?, oral_care_check=?,
-                        oral_care_staff_id=?, weight=?, health_notes=?, memo1=?, memo2=?
+                        oral_care_staff_id=?, weight=?, health_notes=?, memo1=?, memo2=?,
+                        log_timestamp = CURRENT_TIMESTAMP -- タイムスタンプを更新
                     WHERE id = ?
                 ''', (is_absent, temperature, pulse, spo2, bp_high, bp_low,
                       medication_check, medication_staff_id,
@@ -776,7 +832,7 @@ def show_excretion_page():
                 if excretion_type and staff1_id:
                     conn = get_db_connection()
                     conn.execute(
-                        'INSERT INTO excretions (log_id, excretion_time, type, staff1_id, staff2_id, notes) VALUES (?, ?, ?, ?, ?, ?)',
+                        'INSERT INTO excretions (log_id, excretion_time, type, staff1_id, staff2_id, notes, excretion_timestamp) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
                         (log_id, excretion_time.strftime('%H:%M:%S'), excretion_type, staff1_id, staff2_id, notes)
                     )
                     conn.commit()
@@ -1039,7 +1095,8 @@ def show_absence_page():
                             support_checked_health_confirm=?, support_content_health_confirm=?,
                             support_checked_medical_recommend=?, support_content_medical_recommend=?,
                             support_checked_next_visit=?, support_date_next_visit=?,
-                            support_checked_other=?, support_content_other=?
+                            support_checked_other=?, support_content_other=?,
+                            absence_timestamp = CURRENT_TIMESTAMP -- タイムスタンプを更新
                         WHERE id = ?
                     ''', (reception_date, reception_staff_id, contact_person,
                           absence_start_date, absence_end_date,
@@ -1074,8 +1131,8 @@ def show_absence_page():
                                             support_checked_health_confirm, support_content_health_confirm,
                                             support_checked_medical_recommend, support_content_medical_recommend,
                                             support_checked_next_visit, support_date_next_visit,
-                                            support_checked_other, support_content_other)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                            support_checked_other, support_content_other, absence_timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                     ''', (selected_user_id, reception_date, reception_staff_id, contact_person,
                           absence_start_date, absence_end_date,
                           reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
