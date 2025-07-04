@@ -31,17 +31,11 @@ def create_tables():
             department_code2 INTEGER,
             department_code3 INTEGER,
             department_code4 INTEGER,
-            department_name4 INTEGER,
+            department_name4 TEXT, -- INTEGERからTEXTに変更
             department_code5 INTEGER,
             retirement_date TEXT
         )
     ''')
-    c.execute('''
-                    INSERT INTO v_current_employee_information 
-                    (employee_id, employee_name, employee_kana, 
-                    department_code1, department_code2, department_code3, department_code4, department_name4, department_code5, retirement_date)
-                    VALUES (1, '職員 タロウ', 'ショクイン　タロウ', 1, 16, 1, 3, 通所係, 0, '')
-                    ''')
                                 
     # 利用者テーブル
     c.execute('''
@@ -220,6 +214,45 @@ def show_staff_page():
                            ORDER BY employee_kana
                            """, get_db_connection())
     st.table(staff_df)
+
+def show_staff_registration_page():
+    """職員登録ページ"""
+    st.header("職員登録")
+
+    with st.form("staff_registration_form"):
+        st.write("##### 新しい職員情報を入力してください")
+
+        employee_name = st.text_input("職員名 *")
+        employee_kana = st.text_input("フリガナ")
+        department_code1 = st.number_input("部署コード1", value=1, step=1)
+        department_code2 = st.number_input("部署コード2", value=16, step=1)
+        department_code3 = st.number_input("部署コード3", value=1, step=1)
+        department_code4 = st.number_input("部署コード4", value=3, step=1)
+        department_name4 = st.text_input("部署名4", value="看護部") # 新しい入力フィールド
+        department_code5 = st.number_input("部署コード5", value=0, step=1)
+        retirement_date = st.date_input("退職年月日", value=None, help="退職している場合のみ入力")
+
+        submitted = st.form_submit_button("職員を登録")
+
+        if submitted:
+            if not employee_name:
+                st.error("職員名は必須です。")
+            else:
+                conn = get_db_connection()
+                try:
+                    conn.execute('''
+                        INSERT INTO v_current_employee_information (employee_name, employee_kana, department_code1, department_code2, department_code3, department_code4, department_name4, department_code5, retirement_date)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (employee_name, employee_kana, department_code1, department_code2, department_code3, department_code4, department_name4, department_code5, retirement_date))
+                    conn.commit()
+                    st.success(f"{employee_name}さんを職員として登録しました。")
+                except sqlite3.IntegrityError:
+                    st.error("その職員名は既に登録されています。")
+                except Exception as e:
+                    st.error(f"処理中にエラーが発生しました: {e}")
+                finally:
+                    conn.close()
+
 
 def show_user_info_page():
     """利用者情報登録ページ"""
@@ -761,12 +794,12 @@ def show_excretion_page():
             SELECT
                 e.excretion_time AS '時間',
                 e.type AS '分類',
-                s1.name AS '介助職員1',
-                s2.name AS '介助職員2',
+                s1.employee_name AS '介助職員1', -- staffテーブルではなくv_current_employee_informationから取得
+                s2.employee_name AS '介助職員2', -- staffテーブルではなくv_current_employee_informationから取得
                 e.notes AS '特記事項'
             FROM excretions e
-            LEFT JOIN staff s1 ON e.staff1_id = s1.id
-            LEFT JOIN staff s2 ON e.staff2_id = s2.id
+            LEFT JOIN v_current_employee_information s1 ON e.staff1_id = s1.employee_id
+            LEFT JOIN v_current_employee_information s2 ON e.staff2_id = s2.employee_id
             WHERE e.log_id = {log_id}
             ORDER BY e.excretion_time
         ''', conn)
@@ -1073,7 +1106,7 @@ def main():
     if 'page' not in st.session_state:
         st.session_state.page = "日誌一覧"
 
-    menu_options = ["日誌一覧", "日誌入力", "排泄入力", "欠席入力", "利用者情報登録", "職員一覧"]
+    menu_options = ["日誌一覧", "日誌入力", "排泄入力", "欠席入力", "利用者情報登録", "職員一覧", "職員登録"] # "職員登録"を追加
 
     # サイドバーのラジオボタンでページを切り替える
     selected_option = st.sidebar.radio(
@@ -1118,6 +1151,8 @@ def main():
         show_user_info_page()
     elif page == "職員一覧":
         show_staff_page()
+    elif page == "職員登録": # 新しいページを追加
+        show_staff_registration_page()
 
 if __name__ == "__main__":
     main()
