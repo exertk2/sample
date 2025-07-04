@@ -834,7 +834,6 @@ def show_log_input_page():
 def show_excretion_page():
     """排泄入力ページ"""
     st.header("排泄入力")
-    st.info("このページを印刷するには、右上の・・・からPrintをクリック")
     st.markdown("""
         <style>
             @media print {
@@ -953,6 +952,7 @@ def show_excretion_page():
 
             # Removed 'key' argument from st.form_submit_button
             submitted = st.form_submit_button("記録を追加")
+            st.info("このページを印刷するには、右上の・・・からPrintをクリック")
 
             if submitted:
                 if excretion_type and staff1_id:
@@ -991,7 +991,6 @@ def show_excretion_page():
 def show_absence_page():
     """欠席加算入力ページ"""
     st.header("欠席加算入力")
-    st.info("このページを印刷するには、右上の・・・からPrintをクリック")
     st.markdown("""
         <style>
             @media print {
@@ -1244,6 +1243,8 @@ def show_absence_page():
         # 33. 欠席情報を登録/更新 (ボタン)
         # Removed 'key' argument from st.form_submit_button
         submitted = st.form_submit_button("欠席情報を登録/更新", disabled=form_disabled)
+        st.info("このページを印刷するには、右上の・・・からPrintをクリック")
+
         if submitted:
             if selected_user_id is None:
                 st.error("欠席者を選択してください。")
