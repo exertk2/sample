@@ -229,7 +229,9 @@ def show_user_info_page():
     selected_user_id_for_edit = user_options[selected_user_name]
     current_user_data = None
     if selected_user_id_for_edit:
-        current_user_data = get_user_by_id(selected_user_id_for_edit)
+        conn = get_db_connection()
+        current_user_data = conn.execute('SELECT * FROM users WHERE user_code = ?', (selected_user_id_for_edit,)).fetchone()
+        conn.close()
 
     # フォームの初期値設定
     initial_user_code = current_user_data['user_code'] if current_user_data else 0
@@ -287,9 +289,8 @@ def show_user_info_page():
         medication_days_selected = []
         for i, day in enumerate(days_of_week):
             with medication_days_cols[i]:
-                disabled_med_day = not use_days_checkbox_states.get(day, False)
-                # If a checkbox is disabled, its value will be False by default if not explicitly set
-                if st.checkbox(day, value=(day in initial_medication_days_list), key=f"medication_{day}_user_info", disabled=disabled_med_day):
+                # medication_days_selected にはチェックされた曜日のみを追加
+                if st.checkbox(day, value=(day in initial_medication_days_list), key=f"medication_{day}_user_info"):
                     medication_days_selected.append(day)
 
         st.write("---")
@@ -298,16 +299,14 @@ def show_user_info_page():
         bath_days_selected = []
         for i, day in enumerate(days_of_week):
             with bath_days_cols[i]:
-                disabled_bath_day = not use_days_checkbox_states.get(day, False)
-                # If a checkbox is disabled, its value will be False by default if not explicitly set
-                if st.checkbox(day, value=(day in initial_bath_days_list), key=f"bath_{day}_user_info", disabled=disabled_bath_day):
+                # bath_days_selected にはチェックされた曜日のみを追加
+                if st.checkbox(day, value=(day in initial_bath_days_list), key=f"bath_{day}_user_info"):
                     bath_days_selected.append(day)
 
         c_submit1, c_submit2 = st.columns(2)
 
         # Unified submit button logic
         submit_label = "新規登録する" if selected_user_id_for_edit is None else "更新する"
-        # Removed 'key' argument from st.form_submit_button
         submitted = c_submit1.form_submit_button(submit_label)
 
         if submitted:
@@ -315,31 +314,46 @@ def show_user_info_page():
                 st.error("氏名は必須です。")
             else:
                 use_days_str = ",".join([day for day, selected in use_days_checkbox_states.items() if selected])
-                medication_days_str = ",".join(medication_days_selected)
-                bath_days_str = ",".join(bath_days_selected)
+                # Check for errors in medication_days and bath_days
+                errors = []
+                selected_use_days = set([day for day, selected in use_days_checkbox_states.items() if selected])
 
-                conn = get_db_connection()
-                try:
-                    if selected_user_id_for_edit is None: # 新規登録
-                        conn.execute('''
-                            INSERT INTO users (user_code, name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days, medication_days, bath_days)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', (user_code, name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days_str, medication_days_str, bath_days_str))
-                        st.success(f"{name}さんの情報を登録しました。")
-                    else: # 更新
-                        conn.execute('''
-                            UPDATE users
-                            SET name=?, kana=?, birthday=?, gender=?, patient_category=?, is_active=?, start_date=?, end_date=?, use_days=?, medication_days=?, bath_days=?
-                            WHERE id=?
-                        ''', (name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days_str, medication_days_str, bath_days_str, selected_user_id_for_edit))
-                        st.success(f"{name}さんの情報を更新しました。")
-                    conn.commit()
-                except sqlite3.IntegrityError:
-                    st.error("その利用者コードは既に登録されています。")
-                except Exception as e:
-                    st.error(f"処理中にエラーが発生しました: {e}")
-                finally:
-                    conn.close()
+                for day in medication_days_selected:
+                    if day not in selected_use_days:
+                        errors.append(f"内服曜日の'{day}'は利用曜日に含まれていません。")
+                for day in bath_days_selected:
+                    if day not in selected_use_days:
+                        errors.append(f"入浴曜日の'{day}'は利用曜日に含まれていません。")
+
+                if errors:
+                    for error in errors:
+                        st.error(error)
+                else:
+                    medication_days_str = ",".join(medication_days_selected)
+                    bath_days_str = ",".join(bath_days_selected)
+
+                    conn = get_db_connection()
+                    try:
+                        if selected_user_id_for_edit is None: # 新規登録
+                            conn.execute('''
+                                INSERT INTO users (user_code, name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days, medication_days, bath_days)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            ''', (user_code, name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days_str, medication_days_str, bath_days_str))
+                            st.success(f"{name}さんの情報を登録しました。")
+                        else: # 更新
+                            conn.execute('''
+                                UPDATE users
+                                SET name=?, kana=?, birthday=?, gender=?, patient_category=?, is_active=?, start_date=?, end_date=?, use_days=?, medication_days=?, bath_days=?
+                                WHERE user_code=?
+                            ''', (name, kana, birthday, gender, patient_category, is_active, start_date, end_date, use_days_str, medication_days_str, bath_days_str, selected_user_id_for_edit))
+                            st.success(f"{name}さんの情報を更新しました。")
+                        conn.commit()
+                    except sqlite3.IntegrityError:
+                        st.error("その利用者コードは既に登録されています。")
+                    except Exception as e:
+                        st.error(f"処理中にエラーが発生しました: {e}")
+                    finally:
+                        conn.close()
 
 
 def show_log_list_page():
@@ -355,7 +369,7 @@ def show_log_list_page():
 
     conn = get_db_connection()
     # 利用曜日に基づいて利用者をフィルタリング
-    query = f"SELECT id, name FROM users WHERE is_active = 1 AND use_days LIKE '%{selected_weekday}%' ORDER BY kana"
+    query = f"SELECT user_code, name FROM users WHERE is_active = 1 AND use_days LIKE '%{selected_weekday}%' ORDER BY kana"
     today_users = conn.execute(query).fetchall()
     conn.close()
 
@@ -378,7 +392,7 @@ def show_log_list_page():
             st.write("**欠席**")
 
         for user in today_users:
-            user_id = user["id"]
+            user_id = user["user_code"] # Use user_code as ID for session state
             user_name = user["name"]
 
             # Use separate columns for each row's elements
@@ -903,9 +917,9 @@ def show_absence_page():
         # 18. 家族の都合 (チェックボックス)
         reason_family_convenience = st.checkbox("家族の都合", value=initial_reason_family_convenience, key="reason_family_convenience_checkbox", disabled=form_disabled)
         # 19. 家族の体調不良 (チェックボックス)
-        reason_family_illness = st.checkbox("家族の体調不良", value=initial_reason_family_illness, key="reason_family_illness_checkbox", disabled=form_disabled)
+        reason_family_illness = st.checkbox("家族の体調不良", value=initial_reason_family_illness, key="reason_family_illness_checkbox", disabled=form_disabled) # 修正
         # 20. 誰が？ (1行入力)
-        reason_family_illness_who = st.text_input("誰が？", value=initial_reason_family_illness_who, key="reason_family_illness_who_input", disabled=form_disabled)
+        reason_family_illness_who = st.text_input("誰が？", value=initial_reason_family_illness_who, key="reason_family_illness_who_input", disabled=form_disabled) # 修正
 
         # 21. 定期受診 (チェックボックス)
         reason_regular_checkup = st.checkbox("定期受診", value=initial_reason_regular_checkup, key="reason_regular_checkup_checkbox", disabled=form_disabled)
