@@ -492,7 +492,7 @@ def show_log_list_page():
         with cols[2]:
             st.markdown("<h5 style='text-align: center;'>排泄</h5>", unsafe_allow_html=True)
         with cols[3]:
-            st.markdown("<h5 style='text-align: center;'>欠席</h5>", unsafe_allow_html=True)
+            st.markdown("<h5 style='text-align: center;'>欠席加算</h5>", unsafe_allow_html=True)
 
         for user in today_users:
             user_id = user["user_code"] # Use user_code as ID for session state
@@ -538,7 +538,7 @@ def show_log_list_page():
                 _, btn_center_col, _ = st.columns([0.3, 0.4, 0.3]) # Adjust ratios as needed
                 with btn_center_col:
                     if st.button("❌", key=f"absence_button_{user_id}"): # Added key suffix
-                        st.session_state.page = "欠席入力"
+                        st.session_state.page = "欠席加算入力"
                         st.session_state.selected_user_id_for_absence = user_id
                         st.session_state.selected_log_date = log_date
                         st.rerun()
@@ -569,6 +569,57 @@ def show_log_input_page():
     """日誌入力ページ"""
     st.header("日誌入力")
     st.info("このページを印刷するには、ブラウザの印刷機能（Windows/Linux: Ctrl + P, Mac: Cmd + P）をご利用ください。")
+    st.markdown("""
+        <style>
+            @media print {
+                /* Streamlitのサイドバーとヘッダー/フッターを印刷時に非表示にする */
+                .st-emotion-cache-vk330y { /* Sidebar wrapper */
+                    display: none !important;
+                }
+                .st-emotion-cache-cnjvw1 { /* Main content area, adjust width */
+                    width: 100% !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+                .st-emotion-cache-18ni7ap { /* Header/Top bar */
+                    display: none !important;
+                }
+                .st-emotion-cache-h4xjwx { /* Footer */
+                    display: none !important;
+                }
+                .st-emotion-cache-1wivf8q { /* Main app container */
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+                /* フォームコンテンツが適切に改ページされるようにする */
+                .stForm {
+                    page-break-inside: auto !important;
+                }
+                /* 個々のブロック内で改ページされないようにする（可能な限り） */
+                .stBlock {
+                    page-break-inside: avoid !important;
+                }
+                /* Streamlitが生成するボタンを非表示にする */
+                .stButton > button {
+                    display: none !important;
+                }
+                /* テキストエリアや入力フィールドが途中で切れないようにする */
+                textarea, input[type="text"], input[type="number"] {
+                    page-break-inside: avoid !important;
+                }
+                /* 一般的なボディとHTMLの印刷調整 */
+                body {
+                    margin: 0;
+                    padding: 0;
+                }
+                html {
+                    margin: 0;
+                    padding: 0;
+                }
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
 
     users = get_user_list()
     user_options = {user['user_code']: user['name'] for user in users}
@@ -784,6 +835,56 @@ def show_excretion_page():
     """排泄入力ページ"""
     st.header("排泄入力")
     st.info("このページを印刷するには、ブラウザの印刷機能（Windows/Linux: Ctrl + P, Mac: Cmd + P）をご利用ください。")
+    st.markdown("""
+        <style>
+            @media print {
+                /* Streamlitのサイドバーとヘッダー/フッターを印刷時に非表示にする */
+                .st-emotion-cache-vk330y { /* Sidebar wrapper */
+                    display: none !important;
+                }
+                .st-emotion-cache-cnjvw1 { /* Main content area, adjust width */
+                    width: 100% !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+                .st-emotion-cache-18ni7ap { /* Header/Top bar */
+                    display: none !important;
+                }
+                .st-emotion-cache-h4xjwx { /* Footer */
+                    display: none !important;
+                }
+                .st-emotion-cache-1wivf8q { /* Main app container */
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+                /* フォームコンテンツが適切に改ページされるようにする */
+                .stForm {
+                    page-break-inside: auto !important;
+                }
+                /* 個々のブロック内で改ページされないようにする（可能な限り） */
+                .stBlock {
+                    page-break-inside: avoid !important;
+                }
+                /* Streamlitが生成するボタンを非表示にする */
+                .stButton > button {
+                    display: none !important;
+                }
+                /* テキストエリアや入力フィールドが途中で切れないようにする */
+                textarea, input[type="text"], input[type="number"] {
+                    page-break-inside: avoid !important;
+                }
+                /* 一般的なボディとHTMLの印刷調整 */
+                body {
+                    margin: 0;
+                    padding: 0;
+                }
+                html {
+                    margin: 0;
+                    padding: 0;
+                }
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
     users = get_user_list()
     user_options = {user['user_code']: user['name'] for user in users}
@@ -888,9 +989,60 @@ def show_excretion_page():
         st.dataframe(records_df, use_container_width=True)
 
 def show_absence_page():
-    """欠席入力ページ"""
+    """欠席加算入力ページ"""
     st.header("欠席入力")
     st.info("このページを印刷するには、ブラウザの印刷機能（Windows/Linux: Ctrl + P, Mac: Cmd + P）をご利用ください。")
+    st.markdown("""
+        <style>
+            @media print {
+                /* Streamlitのサイドバーとヘッダー/フッターを印刷時に非表示にする */
+                .st-emotion-cache-vk330y { /* Sidebar wrapper */
+                    display: none !important;
+                }
+                .st-emotion-cache-cnjvw1 { /* Main content area, adjust width */
+                    width: 100% !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+                .st-emotion-cache-18ni7ap { /* Header/Top bar */
+                    display: none !important;
+                }
+                .st-emotion-cache-h4xjwx { /* Footer */
+                    display: none !important;
+                }
+                .st-emotion-cache-1wivf8q { /* Main app container */
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+                /* フォームコンテンツが適切に改ページされるようにする */
+                .stForm {
+                    page-break-inside: auto !important;
+                }
+                /* 個々のブロック内で改ページされないようにする（可能な限り） */
+                .stBlock {
+                    page-break-inside: avoid !important;
+                }
+                /* Streamlitが生成するボタンを非表示にする */
+                .stButton > button {
+                    display: none !important;
+                }
+                /* テキストエリアや入力フィールドが途中で切れないようにする */
+                textarea, input[type="text"], input[type="number"] {
+                    page-break-inside: avoid !important;
+                }
+                /* 一般的なボディとHTMLの印刷調整 */
+                body {
+                    margin: 0;
+                    padding: 0;
+                }
+                html {
+                    margin: 0;
+                    padding: 0;
+                }
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
 
     users = get_user_list()
     user_options = {user['user_code']: user['name'] for user in users}
