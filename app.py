@@ -568,7 +568,6 @@ def show_log_list_page():
 def show_log_input_page():
     """日誌入力ページ"""
     st.header("日誌入力")
-    st.info("このページを印刷するには、右上の・・・からPrintをクリック")
     st.markdown("""
         <style>
             @media print {
@@ -808,6 +807,7 @@ def show_log_input_page():
 
             # Removed 'key' argument from st.form_submit_button
             submitted = st.form_submit_button("日誌を保存")
+            st.info("このページを印刷するには、右上の・・・からPrintをクリック")
             if submitted:
                 conn = get_db_connection()
                 # Use current values from Streamlit widgets, not log_data, as they reflect user input
