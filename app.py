@@ -492,7 +492,7 @@ def show_log_list_page():
         with cols[2]:
             st.markdown("<h5 style='text-align: center;'>排泄</h5>", unsafe_allow_html=True)
         with cols[3]:
-            st.markdown("<h5 style='text-align: center;'>欠席加算</h5>", unsafe_allow_html=True)
+            st.markdown("<h5 style='text-align: center;'>欠席</h5>", unsafe_allow_html=True)
 
         for user in today_users:
             user_id = user["user_code"] # Use user_code as ID for session state
@@ -568,6 +568,44 @@ def show_log_list_page():
 def show_log_input_page():
     """日誌入力ページ"""
     st.header("日誌入力")
+    # Add a print button
+    st.markdown("""
+        <style>
+            .print-button {
+                background-color: #4CAF50; /* Green */
+                border: none;
+                color: white;
+                padding: 10px 20px;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 16px;
+                margin: 4px 2px;
+                cursor: pointer;
+                border-radius: 8px;
+            }
+            @media print {
+                /* Optionally hide elements not needed for print */
+                .stButton > button {
+                    visibility: hidden;
+                }
+                .print-button {
+                    visibility: hidden;
+                }
+                /* Ensure content fits on page */
+                body {
+                    margin: 0;
+                    padding: 0;
+                }
+                .stApp {
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+            }
+        </style>
+        <button class="print-button" onclick="window.print()">このページを印刷</button>
+    """, unsafe_allow_html=True)
+
 
     users = get_user_list()
     user_options = {user['user_code']: user['name'] for user in users}
@@ -782,6 +820,41 @@ def show_log_input_page():
 def show_excretion_page():
     """排泄入力ページ"""
     st.header("排泄入力")
+    # Add a print button
+    st.markdown("""
+        <style>
+            .print-button {
+                background-color: #4CAF50; /* Green */
+                border: none;
+                color: white;
+                padding: 10px 20px;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 16px;
+                margin: 4px 2px;
+                cursor: pointer;
+                border-radius: 8px;
+            }
+            @media print {
+                .stButton > button {
+                    visibility: hidden;
+                }
+                .print-button {
+                    visibility: hidden;
+                }
+                body {
+                    margin: 0;
+                    padding: 0;
+                }
+                .stApp {
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+            }
+        </style>
+        <button class="print-button" onclick="window.print()">このページを印刷</button>
+    """, unsafe_allow_html=True)
 
     users = get_user_list()
     user_options = {user['user_code']: user['name'] for user in users}
@@ -888,6 +961,42 @@ def show_excretion_page():
 def show_absence_page():
     """欠席入力ページ"""
     st.header("欠席入力")
+    # Add a print button
+    st.markdown("""
+        <style>
+            .print-button {
+                background-color: #4CAF50; /* Green */
+                border: none;
+                color: white;
+                padding: 10px 20px;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 16px;
+                margin: 4px 2px;
+                cursor: pointer;
+                border-radius: 8px;
+            }
+            @media print {
+                .stButton > button {
+                    visibility: hidden;
+                }
+                .print-button {
+                    visibility: hidden;
+                }
+                body {
+                    margin: 0;
+                    padding: 0;
+                }
+                .stApp {
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+            }
+        </style>
+        <button class="print-button" onclick="window.print()">このページを印刷</button>
+    """, unsafe_allow_html=True)
+
 
     users = get_user_list()
     user_options = {user['user_code']: user['name'] for user in users}
