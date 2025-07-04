@@ -36,7 +36,13 @@ def create_tables():
             retirement_date TEXT
         )
     ''')
-
+    c.execute('''
+                    INSERT INTO v_current_employee_information 
+                    (employee_id, employee_name, employee_kana, 
+                    department_code1, department_code2, department_code3, department_code4, department_name4, department_code5, retirement_date)
+                    VALUES (1, '職員 タロウ', 'ショクイン　タロウ', 1, 16, 1, 3, 通所係, 0, '')
+                    ''')
+                                
     # 利用者テーブル
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
