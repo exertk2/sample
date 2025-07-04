@@ -921,12 +921,16 @@ def show_absence_page():
         # 17. 本人の体調不良以外 (チェックボックス)
         reason_other_than_self_illness = st.checkbox("本人の体調不良以外", value=initial_reason_other_than_self_illness, key="reason_other_than_self_illness_checkbox", disabled=form_disabled)
 
+        col_c1, col_c2, col_c3 = st.columns(3)
         # 18. 家族の都合 (チェックボックス)
-        reason_family_convenience = st.checkbox("家族の都合", value=initial_reason_family_convenience, key="reason_family_convenience_checkbox", disabled=form_disabled)
+        with col_c1:
+            reason_family_convenience = st.checkbox("家族の都合", value=initial_reason_family_convenience, key="reason_family_convenience_checkbox", disabled=form_disabled)
         # 19. 家族の体調不良 (チェックボックス)
-        reason_family_illness = st.checkbox("家族の体調不良", value=initial_reason_family_illness, key="reason_family_illness_checkbox", disabled=form_disabled) # 修正
+        with col_c2:
+            reason_family_illness = st.checkbox("家族の体調不良", value=initial_reason_family_illness, key="reason_family_illness_checkbox", disabled=form_disabled) # 修正
         # 20. 誰が？ (1行入力)
-        reason_family_illness_who = st.text_input("誰が？", value=initial_reason_family_illness_who, key="reason_family_illness_who_input", disabled=form_disabled) # 修正
+        with col_c3:
+            reason_family_illness_who = st.text_input("誰が？", value=initial_reason_family_illness_who, key="reason_family_illness_who_input", disabled=form_disabled) # 修正
 
         # 21. 定期受診 (チェックボックス)
         reason_regular_checkup = st.checkbox("定期受診", value=initial_reason_regular_checkup, key="reason_regular_checkup_checkbox", disabled=form_disabled)
