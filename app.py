@@ -602,10 +602,6 @@ def show_log_input_page():
                 .stButton > button {
                     display: none !important;
                 }
-                /* st.info メッセージを印刷時に非表示にする */
-                .st-emotion-cache-zt5ig8 { /* This is a common class for st.info alerts */
-                    display: none !important;
-                }
                 /* テキストエリアや入力フィールドが途中で切れないようにする */
                 textarea, input[type="text"], input[type="number"] {
                     page-break-inside: avoid !important;
@@ -872,10 +868,6 @@ def show_excretion_page():
                 .stButton > button {
                     display: none !important;
                 }
-                /* st.info メッセージを印刷時に非表示にする */
-                .st-emotion-cache-zt5ig8 { /* This is a common class for st.info alerts */
-                    display: none !important;
-                }
                 /* テキストエリアや入力フィールドが途中で切れないようにする */
                 textarea, input[type="text"], input[type="number"] {
                     page-break-inside: avoid !important;
@@ -1031,10 +1023,6 @@ def show_absence_page():
                 }
                 /* Streamlitが生成するボタンを非表示にする */
                 .stButton > button {
-                    display: none !important;
-                }
-                /* st.info メッセージを印刷時に非表示にする */
-                .st-emotion-cache-zt5ig8 { /* This is a common class for st.info alerts */
                     display: none !important;
                 }
                 /* テキストエリアや入力フィールドが途中で切れないようにする */
