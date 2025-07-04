@@ -486,13 +486,13 @@ def show_log_list_page():
         # Adjusted column widths to accommodate timestamp
         cols = st.columns([0.3, 0.2, 0.2, 0.2]) # Name, Log (Button + Time), Excretion (Button + Time), Absence (Button + Time)
         with cols[0]:
-            st.write("**氏名**")
+            st.markdown("<h5 style='text-align: center;'>氏名</h5>", unsafe_allow_html=True)
         with cols[1]:
-            st.write("**日誌**")
+            st.markdown("<h5 style='text-align: center;'>日誌</h5>", unsafe_allow_html=True)
         with cols[2]:
-            st.write("**排泄**")
+            st.markdown("<h5 style='text-align: center;'>排泄</h5>", unsafe_allow_html=True)
         with cols[3]:
-            st.write("**欠席**")
+            st.markdown("<h5 style='text-align: center;'>欠席</h5>", unsafe_allow_html=True)
 
         for user in today_users:
             user_id = user["user_code"] # Use user_code as ID for session state
@@ -506,36 +506,45 @@ def show_log_list_page():
 
             # Daily Log button and timestamp
             with col_log:
-                log_col1, log_col2 = st.columns([0.4, 0.6])
-                if log_col1.button("✏️", key=f"log_button_{user_id}"): # Added key suffix
-                    st.session_state.page = "日誌入力"
-                    st.session_state.selected_user_id_for_log = user_id
-                    st.session_state.selected_log_date = log_date
-                    st.rerun()
+                # Use columns to center the button
+                _, btn_center_col, _ = st.columns([0.3, 0.4, 0.3]) # Adjust ratios as needed
+                with btn_center_col:
+                    if st.button("✏️", key=f"log_button_{user_id}"): # Added key suffix
+                        st.session_state.page = "日誌入力"
+                        st.session_state.selected_user_id_for_log = user_id
+                        st.session_state.selected_log_date = log_date
+                        st.rerun()
                 if user_id in log_timestamps:
-                    log_col2.write(f"({log_timestamps[user_id]})")
+                    # Center the timestamp text
+                    st.markdown(f"<div style='text-align: center; font-size: 0.8em;'>({log_timestamps[user_id]})</div>", unsafe_allow_html=True)
 
             # Excretion button and timestamp
             with col_excretion:
-                excretion_col1, excretion_col2 = st.columns([0.4, 0.6])
-                if excretion_col1.button("🚽", key=f"excretion_button_{user_id}"): # Added key suffix
-                    st.session_state.page = "排泄入力"
-                    st.session_state.selected_user_id_for_excretion = user_id
-                    st.session_state.selected_log_date = log_date
-                    st.rerun()
+                # Use columns to center the button
+                _, btn_center_col, _ = st.columns([0.3, 0.4, 0.3]) # Adjust ratios as needed
+                with btn_center_col:
+                    if st.button("🚽", key=f"excretion_button_{user_id}"): # Added key suffix
+                        st.session_state.page = "排泄入力"
+                        st.session_state.selected_user_id_for_excretion = user_id
+                        st.session_state.selected_log_date = log_date
+                        st.rerun()
                 if user_id in excretion_timestamps:
-                    excretion_col2.write(f"({excretion_timestamps[user_id]})")
+                    # Center the timestamp text
+                    st.markdown(f"<div style='text-align: center; font-size: 0.8em;'>({excretion_timestamps[user_id]})</div>", unsafe_allow_html=True)
 
             # Absence button and timestamp
             with col_absence:
-                absence_col1, absence_col2 = st.columns([0.4, 0.6])
-                if absence_col1.button("❌", key=f"absence_button_{user_id}"): # Added key suffix
-                    st.session_state.page = "欠席入力"
-                    st.session_state.selected_user_id_for_absence = user_id
-                    st.session_state.selected_log_date = log_date
-                    st.rerun()
+                # Use columns to center the button
+                _, btn_center_col, _ = st.columns([0.3, 0.4, 0.3]) # Adjust ratios as needed
+                with btn_center_col:
+                    if st.button("❌", key=f"absence_button_{user_id}"): # Added key suffix
+                        st.session_state.page = "欠席入力"
+                        st.session_state.selected_user_id_for_absence = user_id
+                        st.session_state.selected_log_date = log_date
+                        st.rerun()
                 if user_id in absence_timestamps:
-                    absence_col2.write(f"({absence_timestamps[user_id]})")
+                    # Center the timestamp text
+                    st.markdown(f"<div style='text-align: center; font-size: 0.8em;'>({absence_timestamps[user_id]})</div>", unsafe_allow_html=True)
 
     st.write("---")
     with st.expander("臨時利用者の追加"):
