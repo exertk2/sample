@@ -9,6 +9,8 @@ DB_FILE = "day_log.db"
 
 # Define Japan Standard Time (JST)
 JST = pytz.timezone('Asia/Tokyo')
+# Define UTC timezone for proper conversion
+UTC = pytz.timezone('UTC')
 
 def get_db_connection():
     """データベース接続を取得する"""
@@ -231,7 +233,7 @@ def show_staff_registration_page():
         department_code2 = st.number_input("部署コード2", value=16, step=1)
         department_code3 = st.number_input("部署コード3", value=1, step=1)
         department_code4 = st.number_input("部署コード4", value=3, step=1)
-        department_name4 = st.text_input("部署名4", value="看護部") # 新しい入力フィールド
+        department_name4 = st.text_input("部署名4", value="通所") # 新しい入力フィールド
         department_code5 = st.number_input("部署コード5", value=0, step=1)
         retirement_date = st.date_input("退職年月日", value=None, help="退職している場合のみ入力")
 
@@ -436,7 +438,11 @@ def show_log_list_page():
             (user_id, log_date_str)
         ).fetchone()
         if log_entry and log_entry['log_timestamp']:
-            log_timestamps[user_id] = datetime.strptime(log_entry['log_timestamp'], '%Y-%m-%d %H:%M:%S').strftime('%H:%M')
+            # Parse as naive datetime, localize to UTC, then convert to JST
+            dt_naive = datetime.strptime(log_entry['log_timestamp'], '%Y-%m-%d %H:%M:%S')
+            dt_utc = UTC.localize(dt_naive)
+            dt_jst = dt_utc.astimezone(JST)
+            log_timestamps[user_id] = dt_jst.strftime('%H:%M')
 
         # 排泄の最終登録日時を取得
         excretion_entry = conn.execute(
@@ -447,7 +453,11 @@ def show_log_list_page():
             (user_id, log_date_str)
         ).fetchone()
         if excretion_entry and excretion_entry['latest_excretion_timestamp']:
-            excretion_timestamps[user_id] = datetime.strptime(excretion_entry['latest_excretion_timestamp'], '%Y-%m-%d %H:%M:%S').strftime('%H:%M')
+            # Parse as naive datetime, localize to UTC, then convert to JST
+            dt_naive = datetime.strptime(excretion_entry['latest_excretion_timestamp'], '%Y-%m-%d %H:%M:%S')
+            dt_utc = UTC.localize(dt_naive)
+            dt_jst = dt_utc.astimezone(JST)
+            excretion_timestamps[user_id] = dt_jst.strftime('%H:%M')
 
         # 欠席の最終登録日時を取得
         absence_entry = conn.execute(
@@ -457,7 +467,11 @@ def show_log_list_page():
             (user_id, log_date_str, log_date_str)
         ).fetchone()
         if absence_entry and absence_entry['latest_absence_timestamp']:
-            absence_timestamps[user_id] = datetime.strptime(absence_entry['latest_absence_timestamp'], '%Y-%m-%d %H:%M:%S').strftime('%H:%M')
+            # Parse as naive datetime, localize to UTC, then convert to JST
+            dt_naive = datetime.strptime(absence_entry['latest_absence_timestamp'], '%Y-%m-%d %H:%M:%S')
+            dt_utc = UTC.localize(dt_naive)
+            dt_jst = dt_utc.astimezone(JST)
+            absence_timestamps[user_id] = dt_jst.strftime('%H:%M')
 
     conn.close()
 
