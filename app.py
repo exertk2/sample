@@ -492,7 +492,7 @@ def show_log_list_page():
         with cols[2]:
             st.markdown("<h5 style='text-align: center;'>排泄</h5>", unsafe_allow_html=True)
         with cols[3]:
-            st.markdown("<h5 style='text-align: center;'>欠席</h5>", unsafe_allow_html=True)
+            st.markdown("<h5 style='text-align: center;'>欠席加算</h5>", unsafe_allow_html=True)
 
         for user in today_users:
             user_id = user["user_code"] # Use user_code as ID for session state
