@@ -967,17 +967,102 @@ def show_excretion_page():
                     st.rerun() # Rerun to refresh the list of records
                 else:
                     st.error("分類と介助職員1は必須です。")
+    else:
+        st.info("利用者と利用日を選択してください。")
 
-        # 記録一覧の表示
-        st.write("---")
-        st.write("##### 本日の記録一覧")
+def show_excretion_record_list_page():
+    """排泄記録一覧ページ"""
+    st.header("排泄記録一覧")
+    st.markdown("""
+        <style>
+            @media print {
+                /* Streamlitのサイドバーとヘッダー/フッターを印刷時に非表示にする */
+                .st-emotion-cache-vk330y { /* Sidebar wrapper */
+                    display: none !important;
+                }
+                .st-emotion-cache-cnjvw1 { /* Main content area, adjust width */
+                    width: 100% !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+                .st-emotion-cache-18ni7ap { /* Header/Top bar */
+                    display: none !important;
+                }
+                .st-emotion-cache-h4xjwx { /* Footer */
+                    display: none !important;
+                }
+                .st-emotion-cache-1wivf8q { /* Main app container */
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+                /* フォームコンテンツが適切に改ページされるようにする */
+                .stForm {
+                    page-break-inside: auto !important;
+                }
+                /* 個々のブロック内で改ページされないようにする（可能な限り） */
+                .stBlock {
+                    page-break-inside: avoid !important;
+                }
+                /* Streamlitが生成するボタンを非表示にする */
+                .stButton > button {
+                    display: none !important;
+                }
+                /* テキストエリアや入力フィールドが途中で切れないようにする */
+                textarea, input[type="text"], input[type="number"] {
+                    page-break-inside: avoid !important;
+                }
+                /* 一般的なボディとHTMLの印刷調整 */
+                body {
+                    margin: 0;
+                    padding: 0;
+                }
+                html {
+                    margin: 0;
+                    padding: 0;
+                }
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    users = get_user_list()
+    user_options = {user['user_code']: user['name'] for user in users}
+
+    current_jst_date = datetime.now(JST).date()
+
+    # Pre-select user and date if coming from log list (via session state)
+    initial_user_id = st.session_state.get('selected_user_id_for_excretion', None)
+    initial_log_date = st.session_state.get('selected_log_date', current_jst_date)
+
+    c1, c2 = st.columns(2)
+
+    # Safely determine the index for the user selectbox
+    selected_user_index = None
+    if initial_user_id is not None and initial_user_id in user_options:
+        try:
+            selected_user_index = list(user_options.keys()).index(initial_user_id)
+        except ValueError:
+            pass # index remains None
+
+    selected_user_id = c1.selectbox(
+        "利用者を選択",
+        options=list(user_options.keys()),
+        format_func=lambda x: user_options.get(x, "選択してください"),
+        index=selected_user_index,
+        key="excretion_list_user_select"
+    )
+    log_date = c2.date_input("対象日", initial_log_date, key="excretion_list_date_select")
+
+    if selected_user_id and log_date:
+        log_id = get_or_create_log_id(selected_user_id, log_date)
+
+        st.write(f"##### {user_options[selected_user_id]}さんの排泄記録 ({log_date.strftime('%Y/%m/%d')})")
         conn = get_db_connection()
         records_df = pd.read_sql_query(f'''
             SELECT
                 e.excretion_time AS '時間',
                 e.type AS '分類',
-                s1.employee_name AS '介助職員1', -- staffテーブルではなくv_current_employee_informationから取得
-                s2.employee_name AS '介助職員2', -- staffテーブルではなくv_current_employee_informationから取得
+                s1.employee_name AS '介助職員1',
+                s2.employee_name AS '介助職員2',
                 e.notes AS '特記事項'
             FROM excretions e
             LEFT JOIN v_current_employee_information s1 ON e.staff1_id = s1.employee_id
@@ -986,7 +1071,14 @@ def show_excretion_page():
             ORDER BY e.excretion_time
         ''', conn)
         conn.close()
-        st.dataframe(records_df, use_container_width=True)
+        
+        if not records_df.empty:
+            st.dataframe(records_df, use_container_width=True)
+        else:
+            st.info("この日の排泄記録はありません。")
+    else:
+        st.info("利用者と対象日を選択して、記録を表示してください。")
+
 
 def show_absence_page():
     """欠席加算入力ページ"""
@@ -1342,7 +1434,8 @@ def main():
     if 'page' not in st.session_state:
         st.session_state.page = "日誌一覧"
 
-    menu_options = ["日誌一覧", "日誌入力", "排泄入力", "欠席加算入力", "利用者情報登録", "職員一覧", "職員登録"] # "職員登録"を追加
+    # Added "排泄記録一覧" to the menu options
+    menu_options = ["日誌一覧", "日誌入力", "排泄入力", "排泄記録一覧", "欠席加算入力", "利用者情報登録", "職員一覧", "職員登録"]
 
     # サイドバーのラジオボタンでページを切り替える
     selected_option = st.sidebar.radio(
@@ -1357,18 +1450,15 @@ def main():
         st.session_state.page = selected_option
         # Clear specific session state variables when navigating from sidebar
         # to prevent pre-filling forms unexpectedly when not coming from list page
-        if selected_option != "日誌入力":
+        if selected_option not in ["日誌入力", "排泄入力", "排泄記録一覧", "欠席加算入力"]: # Keep for related pages
             if 'selected_user_id_for_log' in st.session_state:
                 del st.session_state.selected_user_id_for_log
-        if selected_option != "排泄入力":
             if 'selected_user_id_for_excretion' in st.session_state:
                 del st.session_state.selected_user_id_for_excretion
-        if selected_option != "欠席加算入力":
             if 'selected_user_id_for_absence' in st.session_state:
                 del st.session_state.selected_user_id_for_absence
-        # Always clear selected_log_date unless staying on a related page (though input pages will set it)
-        if 'selected_log_date' in st.session_state:
-            del st.session_state.selected_log_date
+            if 'selected_log_date' in st.session_state:
+                del st.session_state.selected_log_date
         st.rerun()
 
 
@@ -1381,6 +1471,8 @@ def main():
         show_log_input_page()
     elif page == "排泄入力":
         show_excretion_page()
+    elif page == "排泄記録一覧": # New page display
+        show_excretion_record_list_page()
     elif page == "欠席加算入力":
         show_absence_page()
     elif page == "利用者情報登録":
