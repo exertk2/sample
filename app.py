@@ -990,7 +990,7 @@ def show_excretion_page():
 
 def show_absence_page():
     """欠席加算入力ページ"""
-    st.header("欠席入力")
+    st.header("欠席加算入力")
     st.info("このページを印刷するには、ブラウザの印刷機能（Windows/Linux: Ctrl + P, Mac: Cmd + P）をご利用ください。")
     st.markdown("""
         <style>
@@ -1330,7 +1330,7 @@ def show_absence_page():
 
 
 # --- メインのアプリケーション実行部分 ---
-def main():
+def main()
     """メイン関数"""
     create_tables() # データベースとテーブルの存在確認・作成
 
@@ -1341,7 +1341,7 @@ def main():
     if 'page' not in st.session_state:
         st.session_state.page = "日誌一覧"
 
-    menu_options = ["日誌一覧", "日誌入力", "排泄入力", "欠席入力", "利用者情報登録", "職員一覧", "職員登録"] # "職員登録"を追加
+    menu_options = ["日誌一覧", "日誌入力", "排泄入力", "欠席加算入力", "利用者情報登録", "職員一覧", "職員登録"] # "職員登録"を追加
 
     # サイドバーのラジオボタンでページを切り替える
     selected_option = st.sidebar.radio(
@@ -1362,7 +1362,7 @@ def main():
         if selected_option != "排泄入力":
             if 'selected_user_id_for_excretion' in st.session_state:
                 del st.session_state.selected_user_id_for_excretion
-        if selected_option != "欠席入力":
+        if selected_option != "欠席加算入力":
             if 'selected_user_id_for_absence' in st.session_state:
                 del st.session_state.selected_user_id_for_absence
         # Always clear selected_log_date unless staying on a related page (though input pages will set it)
@@ -1380,7 +1380,7 @@ def main():
         show_log_input_page()
     elif page == "排泄入力":
         show_excretion_page()
-    elif page == "欠席入力":
+    elif page == "欠席加算入力":
         show_absence_page()
     elif page == "利用者情報登録":
         show_user_info_page()
