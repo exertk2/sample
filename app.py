@@ -673,161 +673,147 @@ def show_log_input_page():
 
         conn.close()
 
-        with st.form("log_input_form"):
-            # Populate form with existing data, handling None values
-            is_absent = log_data['is_absent'] if log_data and log_data['is_absent'] is not None else False
-            st.checkbox("欠席", value=is_absent, key="log_is_absent_checkbox") # Added key
+        # Populate form with existing data, handling None values
+        is_absent = st.checkbox("欠席", value=log_data['is_absent'] if log_data and log_data['is_absent'] is not None else False, key="log_is_absent_checkbox") # Added key
 
-            st.write("---")
-            st.write("##### バイタル")
-            c1, c2, c3, c4, c5 = st.columns(5)
-            temperature = c1.number_input("体温", min_value=30.0, max_value=45.0, step=0.1, format="%.1f",
-                                value=log_data['temperature'] if log_data and log_data['temperature'] is not None else 36.5, key="temperature_input")
-            pulse = c2.number_input("脈", min_value=0, max_value=200, step=1,
-                                value=log_data['pulse'] if log_data and log_data['pulse'] is not None else 70, key="pulse_input")
-            spo2 = c3.number_input("SPO2", min_value=0, max_value=100, step=1,
-                                value=log_data['spo2'] if log_data and log_data['spo2'] is not None else 98, key="spo2_input")
-            bp_high = c4.number_input("最高血圧", min_value=0, max_value=300, step=1,
-                                value=log_data['bp_high'] if log_data and log_data['bp_high'] is not None else 120, key="bp_high_input")
-            bp_low = c5.number_input("最低血圧", min_value=0, max_value=200, step=1,
-                                value=log_data['bp_low'] if log_data and log_data['bp_low'] is not None else 80, key="bp_low_input")
-            weight = c1.number_input("体重", min_value=0.0, max_value=200.0, step=0.1, format="%.1f",
-                                value=log_data['weight'] if log_data and log_data['weight'] is not None else 50.0, key="weight_input")
+        st.write("---")
+        st.write("##### バイタル")
+        c1, c2, c3, c4, c5 = st.columns(5)
+        temperature = c1.number_input("体温", min_value=30.0, max_value=45.0, step=0.1, format="%.1f",
+                            value=log_data['temperature'] if log_data and log_data['temperature'] is not None else 36.5, key="temperature_input")
+        pulse = c2.number_input("脈", min_value=0, max_value=200, step=1,
+                            value=log_data['pulse'] if log_data and log_data['pulse'] is not None else 70, key="pulse_input")
+        spo2 = c3.number_input("SPO2", min_value=0, max_value=100, step=1,
+                            value=log_data['spo2'] if log_data and log_data['spo2'] is not None else 98, key="spo2_input")
+        bp_high = c4.number_input("最高血圧", min_value=0, max_value=300, step=1,
+                            value=log_data['bp_high'] if log_data and log_data['bp_high'] is not None else 120, key="bp_high_input")
+        bp_low = c5.number_input("最低血圧", min_value=0, max_value=200, step=1,
+                            value=log_data['bp_low'] if log_data and log_data['bp_low'] is not None else 80, key="bp_low_input")
+        weight = c1.number_input("体重", min_value=0.0, max_value=200.0, step=0.1, format="%.1f",
+                            value=log_data['weight'] if log_data and log_data['weight'] is not None else 50.0, key="weight_input")
 
-            st.write("---")
-            st.write("##### 内服・口腔ケア")
-            c1, c2 = st.columns(2)
-            medication_check = c1.checkbox("内服実施", value=log_data['medication_check'] if log_data and log_data['medication_check'] is not None else False, key="medication_check_checkbox") # Added key
+        st.write("---")
+        st.write("##### 内服・口腔ケア")
+        c1, c2 = st.columns(2)
+        medication_check = c1.checkbox("内服実施", value=log_data['medication_check'] if log_data and log_data['medication_check'] is not None else False, key="medication_check_checkbox") # Added key
 
-            medication_staff_index = None
-            if log_data and log_data['medication_staff_id'] is not None and log_data['medication_staff_id'] in staff_options:
-                try:
-                    medication_staff_index = list(staff_options.keys()).index(log_data['medication_staff_id'])
-                except ValueError:
-                    pass
+        medication_staff_index = None
+        if log_data and log_data['medication_staff_id'] is not None and log_data['medication_staff_id'] in staff_options:
+            try:
+                medication_staff_index = list(staff_options.keys()).index(log_data['medication_staff_id'])
+            except ValueError:
+                pass
 
-            # 内服実施が未チェックの場合、または臨時利用者ではない場合のみ disabled
-            # disable_med_staff_input = (not medication_check) and (not is_temporary_user_for_log_date) # Original line
-            medication_staff_id = c2.selectbox(
-                "内服実施職員",
-                options=list(staff_options.keys()),
-                format_func=lambda x: staff_options.get(x),
-                index=medication_staff_index,
-                # disabled=disable_med_staff_input, # MODIFICATION: Removed disabled attribute
-                key="medication_staff_select" # Added key
-            )
+        medication_staff_id = c2.selectbox(
+            "内服実施職員",
+            options=list(staff_options.keys()),
+            format_func=lambda x: staff_options.get(x),
+            index=medication_staff_index,
+            key="medication_staff_select" # Added key
+        )
 
-            c1, c2 = st.columns(2)
-            oral_care_check = c1.checkbox("口腔ケア実施", value=log_data['oral_care_check'] if log_data and log_data['oral_care_check'] is not None else False, key="oral_care_check_checkbox") # Added key
+        c1, c2 = st.columns(2)
+        oral_care_check = c1.checkbox("口腔ケア実施", value=log_data['oral_care_check'] if log_data and log_data['oral_care_check'] is not None else False, key="oral_care_check_checkbox") # Added key
 
-            oral_care_staff_index = None
-            if log_data and log_data['oral_care_staff_id'] is not None and log_data['oral_care_staff_id'] in staff_options:
-                try:
-                    oral_care_staff_index = list(staff_options.keys()).index(log_data['oral_care_staff_id'])
-                except ValueError:
-                    pass
+        oral_care_staff_index = None
+        if log_data and log_data['oral_care_staff_id'] is not None and log_data['oral_care_staff_id'] in staff_options:
+            try:
+                oral_care_staff_index = list(staff_options.keys()).index(log_data['oral_care_staff_id'])
+            except ValueError:
+                pass
 
-            # 口腔ケア実施が未チェックの場合、または臨時利用者ではない場合のみ disabled
-            # disable_oral_staff_input = (not oral_care_check) and (not is_temporary_user_for_log_date) # Original line
-            oral_care_staff_id = c2.selectbox(
-                "口腔ケア実施職員",
-                options=list(staff_options.keys()),
-                format_func=lambda x: staff_options.get(x),
-                index=oral_care_staff_index,
-                # disabled=disable_oral_staff_input, # MODIFICATION: Removed disabled attribute
-                key="oral_care_staff_select" # Added key
-            )
+        oral_care_staff_id = c2.selectbox(
+            "口腔ケア実施職員",
+            options=list(staff_options.keys()),
+            format_func=lambda x: staff_options.get(x),
+            index=oral_care_staff_index,
+            key="oral_care_staff_select" # Added key
+        )
 
-            st.write("---")
-            st.write("##### 入浴")
-            bath_check = st.checkbox("入浴実施", value=log_data['bath_check'] if log_data and log_data['bath_check'] is not None else False, key="bath_check_checkbox") # Added key
-            c1, c2, c3, c4 = st.columns(4)
+        st.write("---")
+        st.write("##### 入浴")
+        bath_check = st.checkbox("入浴実施", value=log_data['bath_check'] if log_data and log_data['bath_check'] is not None else False, key="bath_check_checkbox") # Added key
+        c1, c2, c3, c4 = st.columns(4)
 
-            # Convert stored time string to datetime.time object for time_input
-            bath_start_time_val = None
-            if log_data and log_data['bath_start_time']:
-                try:
-                    bath_start_time_val = datetime.strptime(log_data['bath_start_time'], '%H:%M:%S').time()
-                except ValueError:
-                    bath_start_time_val = time(9, 0) # Default if parsing fails
-            else:
-                bath_start_time_val = time(9, 0) # Default if None from DB
+        # Convert stored time string to datetime.time object for time_input
+        bath_start_time_val = None
+        if log_data and log_data['bath_start_time']:
+            try:
+                bath_start_time_val = datetime.strptime(log_data['bath_start_time'], '%H:%M:%S').time()
+            except ValueError:
+                bath_start_time_val = time(9, 0) # Default if parsing fails
+        else:
+            bath_start_time_val = time(9, 0) # Default if None from DB
 
-            bath_end_time_val = None
-            if log_data and log_data['bath_end_time']:
-                try:
-                    bath_end_time_val = datetime.strptime(log_data['bath_end_time'], '%H:%M:%S').time()
-                except ValueError:
-                    bath_end_time_val = time(10, 0) # Default if parsing fails
-            else:
-                bath_end_time_val = time(10, 0) # Default if None from DB
+        bath_end_time_val = None
+        if log_data and log_data['bath_end_time']:
+            try:
+                bath_end_time_val = datetime.strptime(log_data['bath_end_time'], '%H:%M:%S').time()
+            except ValueError:
+                bath_end_time_val = time(10, 0) # Default if parsing fails
+        else:
+            bath_end_time_val = time(10, 0) # Default if None from DB
 
-            # 入浴実施が未チェックの場合、または臨時利用者ではない場合のみ disabled
-            # disable_bath_input = (not bath_check) and (not is_temporary_user_for_log_date) # Original line
+        bath_start_time = c1.time_input("入浴開始時間", value=bath_start_time_val,
+                                        key="bath_start_time_input") # Added key
 
-            bath_start_time = c1.time_input("入浴開始時間", value=bath_start_time_val, # MODIFICATION: Removed disabled attribute
-                                            key="bath_start_time_input") # Added key
+        bath_start_staff_index = None
+        if log_data and log_data['bath_start_staff_id'] is not None and log_data['bath_start_staff_id'] in staff_options:
+            try:
+                bath_start_staff_index = list(staff_options.keys()).index(log_data['bath_start_staff_id'])
+            except ValueError:
+                pass
+        bath_start_staff_id = c2.selectbox(
+            "開始記録職員",
+            options=list(staff_options.keys()),
+            format_func=lambda x: staff_options.get(x),
+            index=bath_start_staff_index,
+            key="bath_start_staff_select", # Renamed key for consistency
+        )
 
-            bath_start_staff_index = None
-            if log_data and log_data['bath_start_staff_id'] is not None and log_data['bath_start_staff_id'] in staff_options:
-                try:
-                    bath_start_staff_index = list(staff_options.keys()).index(log_data['bath_start_staff_id'])
-                except ValueError:
-                    pass
-            bath_start_staff_id = c2.selectbox(
-                "開始記録職員",
-                options=list(staff_options.keys()),
-                format_func=lambda x: staff_options.get(x),
-                index=bath_start_staff_index,
-                key="bath_start_staff_select", # Renamed key for consistency
-                # disabled=disable_bath_input # MODIFICATION: Removed disabled attribute
-            )
+        bath_end_time = c3.time_input("入浴終了時間", value=bath_end_time_val,
+                                      key="bath_end_time_input") # Added key
 
-            bath_end_time = c3.time_input("入浴終了時間", value=bath_end_time_val, # MODIFICATION: Removed disabled attribute
-                                          key="bath_end_time_input") # Added key
+        bath_end_staff_index = None
+        if log_data and log_data['bath_end_staff_id'] is not None and log_data['bath_end_staff_id'] in staff_options:
+            try:
+                bath_end_staff_index = list(staff_options.keys()).index(log_data['bath_end_staff_id'])
+            except ValueError:
+                pass
+        bath_end_staff_id = c4.selectbox(
+            "終了記録職員",
+            options=list(staff_options.keys()),
+            format_func=lambda x: staff_options.get(x),
+            index=bath_end_staff_index,
+            key="bath_end_staff_select", # Renamed key for consistency
+        )
 
-            bath_end_staff_index = None
-            if log_data and log_data['bath_end_staff_id'] is not None and log_data['bath_end_staff_id'] in staff_options:
-                try:
-                    bath_end_staff_index = list(staff_options.keys()).index(log_data['bath_end_staff_id'])
-                except ValueError:
-                    pass
-            bath_end_staff_id = c4.selectbox(
-                "終了記録職員",
-                options=list(staff_options.keys()),
-                format_func=lambda x: staff_options.get(x),
-                index=bath_end_staff_index,
-                key="bath_end_staff_select", # Renamed key for consistency
-                # disabled=disable_bath_input # MODIFICATION: Removed disabled attribute
-            )
+        st.write("---")
+        health_notes = st.text_area("特記（体調面）", value=log_data['health_notes'] if log_data and log_data['health_notes'] is not None else "", key="health_notes_input") # Added key
+        memo1 = st.text_area("その他１", value=log_data['memo1'] if log_data and log_data['memo1'] is not None else "", key="memo1_input") # Added key
+        memo2 = st.text_area("その他２", value=log_data['memo2'] if log_data and log_data['memo2'] is not None else "", key="memo2_input") # Added key
 
-            st.write("---")
-            health_notes = st.text_area("特記（体調面）", value=log_data['health_notes'] if log_data and log_data['health_notes'] is not None else "", key="health_notes_input") # Added key
-            memo1 = st.text_area("その他１", value=log_data['memo1'] if log_data and log_data['memo1'] is not None else "", key="memo1_input") # Added key
-            memo2 = st.text_area("その他２", value=log_data['memo2'] if log_data and log_data['memo2'] is not None else "", key="memo2_input") # Added key
-
-            # Removed 'key' argument from st.form_submit_button
-            submitted = st.form_submit_button("日誌を保存")
-            if submitted:
-                conn = get_db_connection()
-                # Use current values from Streamlit widgets, not log_data, as they reflect user input
-                conn.execute('''
-                    UPDATE daily_logs
-                    SET is_absent=?, temperature=?, pulse=?, spo2=?, bp_high=?, bp_low=?,
-                        medication_check=?, medication_staff_id=?, bath_check=?, bath_start_time=?,
-                        bath_start_staff_id=?, bath_end_time=?, bath_end_staff_id=?, oral_care_check=?,
-                        oral_care_staff_id=?, weight=?, health_notes=?, memo1=?, memo2=?,
-                        log_timestamp = CURRENT_TIMESTAMP -- タイムスタンプを更新
-                    WHERE id = ?
-                ''', (is_absent, temperature, pulse, spo2, bp_high, bp_low,
-                      medication_check, medication_staff_id,
-                      bath_check, bath_start_time.strftime('%H:%M:%S') if bath_start_time else None, # Store time as string
-                      bath_start_staff_id, bath_end_time.strftime('%H:%M:%S') if bath_end_time else None, # Store time as string
-                      bath_end_staff_id, oral_care_check,
-                      oral_care_staff_id, weight, health_notes, memo1, memo2, log_id))
-                conn.commit()
-                conn.close()
-                st.success("日誌を保存しました。")
+        submitted = st.button("日誌を保存")
+        if submitted:
+            conn = get_db_connection()
+            # Use current values from Streamlit widgets, not log_data, as they reflect user input
+            conn.execute('''
+                UPDATE daily_logs
+                SET is_absent=?, temperature=?, pulse=?, spo2=?, bp_high=?, bp_low=?,
+                    medication_check=?, medication_staff_id=?, bath_check=?, bath_start_time=?,
+                    bath_start_staff_id=?, bath_end_time=?, bath_end_staff_id=?, oral_care_check=?,
+                    oral_care_staff_id=?, weight=?, health_notes=?, memo1=?, memo2=?,
+                    log_timestamp = CURRENT_TIMESTAMP -- タイムスタンプを更新
+                WHERE id = ?
+            ''', (is_absent, temperature, pulse, spo2, bp_high, bp_low,
+                  medication_check, medication_staff_id,
+                  bath_check, bath_start_time.strftime('%H:%M:%S') if bath_start_time else None, # Store time as string
+                  bath_start_staff_id, bath_end_time.strftime('%H:%M:%S') if bath_end_time else None, # Store time as string
+                  bath_end_staff_id, oral_care_check,
+                  oral_care_staff_id, weight, health_notes, memo1, memo2, log_id))
+            conn.commit()
+            conn.close()
+            st.success("日誌を保存しました。")
     else:
         st.info("利用者と利用日を選択してください。")
 
@@ -925,48 +911,46 @@ def show_excretion_page():
     if selected_user_id and log_date:
         log_id = get_or_create_log_id(selected_user_id, log_date)
 
-        with st.form("excretion_form"):
-            st.write(f"##### {user_options[selected_user_id]}さんの排泄記録")
+        st.write(f"##### {user_options[selected_user_id]}さんの排泄記録")
 
-            c1, c2 = st.columns(2)
-            excretion_time = c1.time_input("排泄時間", value=current_jst_time, key="excretion_time_input") # Added key
-            excretion_type = c2.selectbox("分類", ["尿", "便"], index=None, key="excretion_type_select") # Added key
+        c1, c2 = st.columns(2)
+        excretion_time = c1.time_input("排泄時間", value=current_jst_time, key="excretion_time_input") # Added key
+        excretion_type = c2.selectbox("分類", ["尿", "便"], index=None, key="excretion_type_select") # Added key
 
-            c1, c2 = st.columns(2)
-            # Safely determine index for staff selectboxes
-            staff1_index = None
-            # No initial value from DB for new excretion record, so index remains None
+        c1, c2 = st.columns(2)
+        # Safely determine index for staff selectboxes
+        staff1_index = None
+        # No initial value from DB for new excretion record, so index remains None
 
-            staff1_id = c1.selectbox("排泄介助職員1", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=staff1_index, key="excretion_staff1_select") # Added key
+        staff1_id = c1.selectbox("排泄介助職員1", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=staff1_index, key="excretion_staff1_select") # Added key
 
-            staff2_index = None
-            # If the option for 'None' exists and we want it as default, find its index.
-            if None in staff_options:
-                 try:
-                     staff2_index = list(staff_options.keys()).index(None)
-                 except ValueError:
-                     pass # Should not happen if None is in staff_options
+        staff2_index = None
+        # If the option for 'None' exists and we want it as default, find its index.
+        if None in staff_options:
+             try:
+                 staff2_index = list(staff_options.keys()).index(None)
+             except ValueError:
+                 pass # Should not happen if None is in staff_options
 
-            staff2_id = c2.selectbox("排泄介助職員2", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=staff2_index, key="excretion_staff2_select") # Added key
+        staff2_id = c2.selectbox("排泄介助職員2", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=staff2_index, key="excretion_staff2_select") # Added key
 
-            notes = st.text_area("特記事項（体調面）", key="excretion_notes_input") # Added key
+        notes = st.text_area("特記事項（体調面）", key="excretion_notes_input") # Added key
 
-            # Removed 'key' argument from st.form_submit_button
-            submitted = st.form_submit_button("記録を追加")
+        submitted = st.button("記録を追加")
 
-            if submitted:
-                if excretion_type and staff1_id:
-                    conn = get_db_connection()
-                    conn.execute(
-                        'INSERT INTO excretions (log_id, excretion_time, type, staff1_id, staff2_id, notes, excretion_timestamp) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-                        (log_id, excretion_time.strftime('%H:%M:%S'), excretion_type, staff1_id, staff2_id, notes)
-                    )
-                    conn.commit()
-                    conn.close()
-                    st.success("排泄記録を追加しました。")
-                    st.rerun() # Rerun to refresh the list of records
-                else:
-                    st.error("分類と介助職員1は必須です。")
+        if submitted:
+            if excretion_type and staff1_id:
+                conn = get_db_connection()
+                conn.execute(
+                    'INSERT INTO excretions (log_id, excretion_time, type, staff1_id, staff2_id, notes, excretion_timestamp) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+                    (log_id, excretion_time.strftime('%H:%M:%S'), excretion_type, staff1_id, staff2_id, notes)
+                )
+                conn.commit()
+                conn.close()
+                st.success("排泄記録を追加しました。")
+                st.rerun() # Rerun to refresh the list of records
+            else:
+                st.error("分類と介助職員1は必須です。")
 
         # 記録一覧の表示
         st.write("---")
@@ -1146,187 +1130,184 @@ def show_absence_page():
     else:
         st.info("欠席者を選択してください。") # Inform user to select a user first
 
-    # Wrap the form elements within st.form
-    with st.form(key="absence_entry_form"):
-        # 2. 受付職員, 3. 受付日
-        c1, c2 = st.columns(2)
-        reception_staff_index = None
-        if initial_reception_staff_id is not None and initial_reception_staff_id in staff_options:
-            try:
-                reception_staff_index = list(staff_options.keys()).index(initial_reception_staff_id)
-            except ValueError:
-                pass
-        reception_staff_id = c1.selectbox("受付職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=reception_staff_index, key="reception_staff_select", disabled=form_disabled)
-        reception_date = c2.date_input("受付日", value=initial_reception_date, key="reception_date_input", disabled=form_disabled)
+    # 2. 受付職員, 3. 受付日
+    c1, c2 = st.columns(2)
+    reception_staff_index = None
+    if initial_reception_staff_id is not None and initial_reception_staff_id in staff_options:
+        try:
+            reception_staff_index = list(staff_options.keys()).index(initial_reception_staff_id)
+        except ValueError:
+            pass
+    reception_staff_id = c1.selectbox("受付職員", options=list(staff_options.keys()), format_func=lambda x: staff_options.get(x), index=reception_staff_index, key="reception_staff_select", disabled=form_disabled)
+    reception_date = c2.date_input("受付日", value=initial_reception_date, key="reception_date_input", disabled=form_disabled)
 
-        # 4. 欠席の連絡者
-        contact_person = st.text_input("欠席の連絡者", value=initial_contact_person, key="contact_person_input", disabled=form_disabled)
+    # 4. 欠席の連絡者
+    contact_person = st.text_input("欠席の連絡者", value=initial_contact_person, key="contact_person_input", disabled=form_disabled)
 
-        # 5. 欠席期間（開始）, 6. 欠席期間（終了）
-        c1, c2 = st.columns(2)
-        absence_start_date = c1.date_input("欠席期間（開始）", value=initial_absence_start_date, key="absence_start_date_input", disabled=form_disabled)
-        absence_end_date = c2.date_input("欠席期間（終了）", value=initial_absence_end_date, key="absence_end_date_input", disabled=form_disabled)
+    # 5. 欠席期間（開始）, 6. 欠席期間（終了）
+    c1, c2 = st.columns(2)
+    absence_start_date = c1.date_input("欠席期間（開始）", value=initial_absence_start_date, key="absence_start_date_input", disabled=form_disabled)
+    absence_end_date = c2.date_input("欠席期間（終了）", value=initial_absence_end_date, key="absence_end_date_input", disabled=form_disabled)
 
-        st.write("---")
-        st.write("##### 欠席理由")
+    st.write("---")
+    st.write("##### 欠席理由")
 
-        # 7. 本人の体調不良 (チェックボックス)
-        reason_self_illness = st.checkbox("本人の体調不良", value=initial_reason_self_illness, key="reason_self_illness_checkbox", disabled=form_disabled)
+    # 7. 本人の体調不良 (チェックボックス)
+    reason_self_illness = st.checkbox("本人の体調不良", value=initial_reason_self_illness, key="reason_self_illness_checkbox", disabled=form_disabled)
 
-        # 8. 発作, 9. 咳, 10. 発熱, 11. 鼻水, 12. 嘔吐, 13. 下痢, 14. 機嫌不良, 15. 発疹
-        col_b1, col_b2, col_b3, col_b4 = st.columns(4)
-        with col_b1:
-            reason_seizure = st.checkbox("発作", value=initial_reason_seizure, key="reason_seizure_checkbox", disabled=form_disabled)
-            reason_cough = st.checkbox("咳", value=initial_reason_cough, key="reason_cough_checkbox", disabled=form_disabled)
-        with col_b2:
-            reason_fever = st.checkbox("発熱", value=initial_reason_fever, key="reason_fever_checkbox", disabled=form_disabled)
-            reason_runny_nose = st.checkbox("鼻水", value=initial_reason_runny_nose, key="reason_runny_nose_checkbox", disabled=form_disabled)
-        with col_b3:
-            reason_vomiting = st.checkbox("嘔吐", value=initial_reason_vomiting, key="reason_vomiting_checkbox", disabled=form_disabled)
-            reason_diarrhea = st.checkbox("下痢", value=initial_reason_diarrhea, key="reason_diarrhea_checkbox", disabled=form_disabled)
-        with col_b4:
-            reason_mood_bad = st.checkbox("機嫌不良", value=initial_reason_mood_bad, key="reason_mood_bad_checkbox", disabled=form_disabled)
-            reason_rash = st.checkbox("発疹", value=initial_reason_rash, key="reason_rash_checkbox", disabled=form_disabled)
-        # 16. その他（本人の体調不良）
-        reason_self_illness_other_text = st.text_area("その他（本人の体調不良）", value=initial_reason_self_illness_other_text, key="reason_self_illness_other_text_input", disabled=form_disabled)
+    # 8. 発作, 9. 咳, 10. 発熱, 11. 鼻水, 12. 嘔吐, 13. 下痢, 14. 機嫌不良, 15. 発疹
+    col_b1, col_b2, col_b3, col_b4 = st.columns(4)
+    with col_b1:
+        reason_seizure = st.checkbox("発作", value=initial_reason_seizure, key="reason_seizure_checkbox", disabled=form_disabled)
+        reason_cough = st.checkbox("咳", value=initial_reason_cough, key="reason_cough_checkbox", disabled=form_disabled)
+    with col_b2:
+        reason_fever = st.checkbox("発熱", value=initial_reason_fever, key="reason_fever_checkbox", disabled=form_disabled)
+        reason_runny_nose = st.checkbox("鼻水", value=initial_reason_runny_nose, key="reason_runny_nose_checkbox", disabled=form_disabled)
+    with col_b3:
+        reason_vomiting = st.checkbox("嘔吐", value=initial_reason_vomiting, key="reason_vomiting_checkbox", disabled=form_disabled)
+        reason_diarrhea = st.checkbox("下痢", value=initial_reason_diarrhea, key="reason_diarrhea_checkbox", disabled=form_disabled)
+    with col_b4:
+        reason_mood_bad = st.checkbox("機嫌不良", value=initial_reason_mood_bad, key="reason_mood_bad_checkbox", disabled=form_disabled)
+        reason_rash = st.checkbox("発疹", value=initial_reason_rash, key="reason_rash_checkbox", disabled=form_disabled)
+    # 16. その他（本人の体調不良）
+    reason_self_illness_other_text = st.text_area("その他（本人の体調不良）", value=initial_reason_self_illness_other_text, key="reason_self_illness_other_text_input", disabled=form_disabled)
 
 
-        # 17. 本人の体調不良以外 (チェックボックス)
-        reason_other_than_self_illness = st.checkbox("本人の体調不良以外", value=initial_reason_other_than_self_illness, key="reason_other_than_self_illness_checkbox", disabled=form_disabled)
+    # 17. 本人の体調不良以外 (チェックボックス)
+    reason_other_than_self_illness = st.checkbox("本人の体調不良以外", value=initial_reason_other_than_self_illness, key="reason_other_than_self_illness_checkbox", disabled=form_disabled)
 
-        col_c1, col_c2, col_c3 = st.columns(3)
-        # 18. 家族の都合 (チェックボックス)
-        with col_c1:
-            reason_family_convenience = st.checkbox("家族の都合", value=initial_reason_family_convenience, key="reason_family_convenience_checkbox", disabled=form_disabled)
-        # 19. 家族の体調不良 (チェックボックス)
-        with col_c2:
-            reason_family_illness = st.checkbox("家族の体調不良", value=initial_reason_family_illness, key="reason_family_illness_checkbox", disabled=form_disabled) # 修正
-        # 20. 誰が？ (1行入力)
-        with col_c3:
-            reason_family_illness_who = st.text_input("誰が？", value=initial_reason_family_illness_who, key="reason_family_illness_who_input", disabled=form_disabled) # 修正
+    col_c1, col_c2, col_c3 = st.columns(3)
+    # 18. 家族の都合 (チェックボックス)
+    with col_c1:
+        reason_family_convenience = st.checkbox("家族の都合", value=initial_reason_family_convenience, key="reason_family_convenience_checkbox", disabled=form_disabled)
+    # 19. 家族の体調不良 (チェックボックス)
+    with col_c2:
+        reason_family_illness = st.checkbox("家族の体調不良", value=initial_reason_family_illness, key="reason_family_illness_checkbox", disabled=form_disabled) # 修正
+    # 20. 誰が？ (1行入力)
+    with col_c3:
+        reason_family_illness_who = st.text_input("誰が？", value=initial_reason_family_illness_who, key="reason_family_illness_who_input", disabled=form_disabled) # 修正
 
-        # 21. 定期受診 (チェックボックス)
-        reason_regular_checkup = st.checkbox("定期受診", value=initial_reason_regular_checkup, key="reason_regular_checkup_checkbox", disabled=form_disabled)
-        # 22. 受診先 (1行入力)
-        reason_checkup_place = st.text_input("受診先", value=initial_reason_checkup_place, key="reason_checkup_place_input", disabled=form_disabled)
+    # 21. 定期受診 (チェックボックス)
+    reason_regular_checkup = st.checkbox("定期受診", value=initial_reason_regular_checkup, key="reason_regular_checkup_checkbox", disabled=form_disabled)
+    # 22. 受診先 (1行入力)
+    reason_checkup_place = st.text_input("受診先", value=initial_reason_checkup_place, key="reason_checkup_place_input", disabled=form_disabled)
 
-        # 23. その他（本人の体調不良以外）
-        reason_other_text = st.text_area("その他（本人の体調不良以外）", value=initial_reason_other_text, key="reason_other_text_input", disabled=form_disabled)
+    # 23. その他（本人の体調不良以外）
+    reason_other_text = st.text_area("その他（本人の体調不良以外）", value=initial_reason_other_text, key="reason_other_text_input", disabled=form_disabled)
 
-        st.write("---")
-        st.write("##### 援助内容")
+    st.write("---")
+    st.write("##### 援助内容")
 
-        # 24. 体調を確認した (チェックボックス)
-        support_checked_health_confirm = st.checkbox("体調を確認した", value=initial_support_checked_health_confirm, key="support_checked_health_confirm_checkbox", disabled=form_disabled)
-        # 25. 内容（体調確認）
-        support_content_health_confirm = st.text_area("内容（体調確認）", value=initial_support_content_health_confirm, key="support_content_health_confirm_input", disabled=form_disabled)
+    # 24. 体調を確認した (チェックボックス)
+    support_checked_health_confirm = st.checkbox("体調を確認した", value=initial_support_checked_health_confirm, key="support_checked_health_confirm_checkbox", disabled=form_disabled)
+    # 25. 内容（体調確認）
+    support_content_health_confirm = st.text_area("内容（体調確認）", value=initial_support_content_health_confirm, key="support_content_health_confirm_input", disabled=form_disabled)
 
-        # 26. 医療機関の受診を勧めた (チェックボックス)
-        support_checked_medical_recommend = st.checkbox("医療機関の受診を勧めた", value=initial_support_checked_medical_recommend, key="support_checked_medical_recommend_checkbox", disabled=form_disabled)
-        # 27. 内容（医療機関の受診）
-        support_content_medical_recommend = st.text_input("内容（医療機関の受診）", value=initial_support_content_medical_recommend, key="support_content_medical_recommend_input", disabled=form_disabled)
+    # 26. 医療機関の受診を勧めた (チェックボックス)
+    support_checked_medical_recommend = st.checkbox("医療機関の受診を勧めた", value=initial_support_checked_medical_recommend, key="support_checked_medical_recommend_checkbox", disabled=form_disabled)
+    # 27. 内容（医療機関の受診）
+    support_content_medical_recommend = st.text_input("内容（医療機関の受診）", value=initial_support_content_medical_recommend, key="support_content_medical_recommend_input", disabled=form_disabled)
 
-        # 28. 次回利用日を確認した (チェックボックス)
-        support_checked_next_visit = st.checkbox("次回利用日を確認した", value=initial_support_checked_next_visit, key="support_checked_next_visit_checkbox", disabled=form_disabled)
-        # 29. 日付（次回利用日）
-        default_next_visit_date = initial_support_date_next_visit if initial_support_date_next_visit else current_jst_date
-        support_date_next_visit = st.date_input("日付（次回利用日）", value=default_next_visit_date, key="support_date_next_visit_input", disabled=form_disabled)
+    # 28. 次回利用日を確認した (チェックボックス)
+    support_checked_next_visit = st.checkbox("次回利用日を確認した", value=initial_support_checked_next_visit, key="support_checked_next_visit_checkbox", disabled=form_disabled)
+    # 29. 日付（次回利用日）
+    default_next_visit_date = initial_support_date_next_visit if initial_support_date_next_visit else current_jst_date
+    support_date_next_visit = st.date_input("日付（次回利用日）", value=default_next_visit_date, key="support_date_next_visit_input", disabled=form_disabled)
 
-        # 30. その他（援助内容） (チェックボックス)
-        support_checked_other = st.checkbox("その他（援助内容）", value=initial_support_checked_other, key="support_checked_other_checkbox", disabled=form_disabled)
-        # 31. 内容（その他援助）
-        support_content_other = st.text_area("内容（その他援助）", value=initial_support_content_other, key="support_content_other_input", disabled=form_disabled)
+    # 30. その他（援助内容） (チェックボックス)
+    support_checked_other = st.checkbox("その他（援助内容）", value=initial_support_checked_other, key="support_checked_other_checkbox", disabled=form_disabled)
+    # 31. 内容（その他援助）
+    support_content_other = st.text_area("内容（その他援助）", value=initial_support_content_other, key="support_content_other_input", disabled=form_disabled)
 
-        # 32. 援助内容（詳細を記入 - 旧フィールド）
-        support_content = st.text_area("援助内容（詳細を記入 - 旧フィールド）", value=initial_support_content, help="例：体調確認、医療機関の受診を勧めた。", key="support_content_old_input", disabled=form_disabled)
+    # 32. 援助内容（詳細を記入 - 旧フィールド）
+    support_content = st.text_area("援助内容（詳細を記入 - 旧フィールド）", value=initial_support_content, help="例：体調確認、医療機関の受診を勧めた。", key="support_content_old_input", disabled=form_disabled)
 
 
-        # 33. 欠席情報を登録/更新 (ボタン)
-        # Removed 'key' argument from st.form_submit_button
-        submitted = st.form_submit_button("欠席情報を登録/更新", disabled=form_disabled)
-        if submitted:
-            if selected_user_id is None:
-                st.error("欠席者を選択してください。")
-            else:
-                conn = get_db_connection()
+    # 33. 欠席情報を登録/更新 (ボタン)
+    submitted = st.button("欠席情報を登録/更新", disabled=form_disabled)
+    if submitted:
+        if selected_user_id is None:
+            st.error("欠席者を選択してください。")
+        else:
+            conn = get_db_connection()
 
-                # Convert datetime.date objects to string for database storage
+            # Convert datetime.date objects to string for database storage
+            support_date_next_visit_str = None
+            if support_checked_next_visit and support_date_next_visit:
+                support_date_next_visit_str = support_date_next_visit.strftime('%Y-%m-%d')
+            elif not support_checked_next_visit: # If checkbox is off, ensure no date is saved
                 support_date_next_visit_str = None
-                if support_checked_next_visit and support_date_next_visit:
-                    support_date_next_visit_str = support_date_next_visit.strftime('%Y-%m-%d')
-                elif not support_checked_next_visit: # If checkbox is off, ensure no date is saved
-                    support_date_next_visit_str = None
 
-                # Check if an existing record needs to be updated or a new one inserted
-                if existing_absence_data:
-                    conn.execute('''
-                        UPDATE absences
-                        SET reception_date=?, reception_staff_id=?, contact_person=?,
-                            absence_start_date=?, absence_end_date=?,
-                            reason_self_illness=?, reason_seizure=?, reason_fever=?, reason_vomiting=?,
-                            reason_cough=?, reason_runny_nose=?, reason_diarrhea=?, reason_mood_bad=?,
-                            reason_rash=?, reason_self_illness_other_text=?,
-                            reason_other_than_self_illness=?, reason_family_convenience=?,
-                            reason_family_illness=?, reason_family_illness_who=?,
-                            reason_regular_checkup=?, reason_checkup_place=?,
-                            reason_other_text=?, support_content=?, -- Original support content
-                            support_checked_health_confirm=?, support_content_health_confirm=?,
-                            support_checked_medical_recommend=?, support_content_medical_recommend=?,
-                            support_checked_next_visit=?, support_date_next_visit=?,
-                            support_checked_other=?, support_content_other=?,
-                            absence_timestamp = CURRENT_TIMESTAMP -- タイムスタンプを更新
-                        WHERE id = ?
-                    ''', (reception_date, reception_staff_id, contact_person,
-                          absence_start_date, absence_end_date,
-                          reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
-                          reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
-                          reason_rash, reason_self_illness_other_text,
-                          reason_other_than_self_illness, reason_family_convenience,
-                          reason_family_illness, reason_family_illness_who, # Use direct widget value
-                          reason_regular_checkup, reason_checkup_place, # Use direct widget value
-                          reason_other_text, support_content, # Original support content
-                          support_checked_health_confirm, support_content_health_confirm, # Use direct widget value
-                          support_checked_medical_recommend, support_content_medical_recommend, # Use direct widget value
-                          support_checked_next_visit, support_date_next_visit_str, # Store date as string
-                          support_checked_other, support_content_other, # Use direct widget value
-                          existing_absence_data['id']))
-                    st.success("欠席情報を更新しました。")
-                else:
-                    # If no user is selected, or no existing data, but submitted:
-                    # Insert logic should be here if it's a new entry (i.e., existing_absence_data is None)
-                    # But if selected_user_id is None, this block won't be reached as submit button is disabled.
-                    # So this 'else' implies selected_user_id IS NOT None but existing_absence_data IS None (new record for selected user).
-                    conn.execute('''
-                        INSERT INTO absences (user_id, reception_date, reception_staff_id, contact_person,
-                                            absence_start_date, absence_end_date,
-                                            reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
-                                            reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
-                                            reason_rash, reason_self_illness_other_text,
-                                            reason_other_than_self_illness, reason_family_convenience,
-                                            reason_family_illness, reason_family_illness_who,
-                                            reason_regular_checkup, reason_checkup_place,
-                                            reason_other_text, support_content, -- Original support content
-                                            support_checked_health_confirm, support_content_health_confirm,
-                                            support_checked_medical_recommend, support_content_medical_recommend,
-                                            support_checked_next_visit, support_date_next_visit,
-                                            support_checked_other, support_content_other, absence_timestamp)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                    ''', (selected_user_id, reception_date, reception_staff_id, contact_person,
-                          absence_start_date, absence_end_date,
-                          reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
-                          reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
-                          reason_rash, reason_self_illness_other_text,
-                          reason_other_than_self_illness, reason_family_convenience,
-                          reason_family_illness, reason_family_illness_who, # Use direct widget value
-                          reason_regular_checkup, reason_checkup_place, # Use direct widget value
-                          reason_other_text, support_content, # Original support content
-                          support_checked_health_confirm, support_content_health_confirm, # Use direct widget value
-                          support_checked_medical_recommend, support_content_medical_recommend, # Use direct widget value
-                          support_checked_next_visit, support_date_next_visit_str, # Store date as string
-                          support_checked_other, support_content_other)) # Use direct widget value
-                conn.commit()
-                conn.close()
-                st.rerun() # Refresh to show updated data if any, or clear form for new entry.
+            # Check if an existing record needs to be updated or a new one inserted
+            if existing_absence_data:
+                conn.execute('''
+                    UPDATE absences
+                    SET reception_date=?, reception_staff_id=?, contact_person=?,
+                        absence_start_date=?, absence_end_date=?,
+                        reason_self_illness=?, reason_seizure=?, reason_fever=?, reason_vomiting=?,
+                        reason_cough=?, reason_runny_nose=?, reason_diarrhea=?, reason_mood_bad=?,
+                        reason_rash=?, reason_self_illness_other_text=?,
+                        reason_other_than_self_illness=?, reason_family_convenience=?,
+                        reason_family_illness=?, reason_family_illness_who=?,
+                        reason_regular_checkup=?, reason_checkup_place=?,
+                        reason_other_text=?, support_content=?, -- Original support content
+                        support_checked_health_confirm=?, support_content_health_confirm=?,
+                        support_checked_medical_recommend=?, support_content_medical_recommend=?,
+                        support_checked_next_visit=?, support_date_next_visit=?,
+                        support_checked_other=?, support_content_other=?,
+                        absence_timestamp = CURRENT_TIMESTAMP -- タイムスタンプを更新
+                    WHERE id = ?
+                ''', (reception_date, reception_staff_id, contact_person,
+                      absence_start_date, absence_end_date,
+                      reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
+                      reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
+                      reason_rash, reason_self_illness_other_text,
+                      reason_other_than_self_illness, reason_family_convenience,
+                      reason_family_illness, reason_family_illness_who, # Use direct widget value
+                      reason_regular_checkup, reason_checkup_place, # Use direct widget value
+                      reason_other_text, support_content, # Original support content
+                      support_checked_health_confirm, support_content_health_confirm, # Use direct widget value
+                      support_checked_medical_recommend, support_content_medical_recommend, # Use direct widget value
+                      support_checked_next_visit, support_date_next_visit_str, # Store date as string
+                      support_checked_other, support_content_other, # Use direct widget value
+                      existing_absence_data['id']))
+                st.success("欠席情報を更新しました。")
+            else:
+                # If no user is selected, or no existing data, but submitted:
+                # Insert logic should be here if it's a new entry (i.e., existing_absence_data is None)
+                # But if selected_user_id is None, this block won't be reached as submit button is disabled.
+                # So this 'else' implies selected_user_id IS NOT None but existing_absence_data IS None (new record for selected user).
+                conn.execute('''
+                    INSERT INTO absences (user_id, reception_date, reception_staff_id, contact_person,
+                                        absence_start_date, absence_end_date,
+                                        reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
+                                        reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
+                                        reason_rash, reason_self_illness_other_text,
+                                        reason_other_than_self_illness, reason_family_convenience,
+                                        reason_family_illness, reason_family_illness_who,
+                                        reason_regular_checkup, reason_checkup_place,
+                                        reason_other_text, support_content, -- Original support content
+                                        support_checked_health_confirm, support_content_health_confirm,
+                                        support_checked_medical_recommend, support_content_medical_recommend,
+                                        support_checked_next_visit, support_date_next_visit,
+                                        support_checked_other, support_content_other, absence_timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (selected_user_id, reception_date, reception_staff_id, contact_person,
+                      absence_start_date, absence_end_date,
+                      reason_self_illness, reason_seizure, reason_fever, reason_vomiting,
+                      reason_cough, reason_runny_nose, reason_diarrhea, reason_mood_bad,
+                      reason_rash, reason_self_illness_other_text,
+                      reason_other_than_self_illness, reason_family_convenience,
+                      reason_family_illness, reason_family_illness_who, # Use direct widget value
+                      reason_regular_checkup, reason_checkup_place, # Use direct widget value
+                      reason_other_text, support_content, # Original support content
+                      support_checked_health_confirm, support_content_health_confirm, # Use direct widget value
+                      support_checked_medical_recommend, support_content_medical_recommend, # Use direct widget value
+                      support_checked_next_visit, support_date_next_visit_str, # Store date as string
+                      support_checked_other, support_content_other)) # Use direct widget value
+            conn.commit()
+            conn.close()
+            st.rerun() # Refresh to show updated data if any, or clear form for new entry.
 
 
 # --- メインのアプリケーション実行部分 ---
