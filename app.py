@@ -23,10 +23,17 @@ def create_tables():
 
     # 職員テーブル
     c.execute('''
-        CREATE TABLE IF NOT EXISTS staff (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            department TEXT DEFAULT '通所支援Ⅰ係'
+        CREATE TABLE IF NOT EXISTS v_current_employee_information (
+            employee_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_name TEXT NOT NULL UNIQUE,
+            employee_kana TEXT,
+            department_code1 INTEGER,
+            department_code2 INTEGER,
+            department_code3 INTEGER,
+            department_code4 INTEGER,
+            department_name4 INTEGER,
+            department_code5 INTEGER,
+            retirement_date TEXT
         )
     ''')
 
