@@ -568,7 +568,7 @@ def show_log_list_page():
 def show_log_input_page():
     """日誌入力ページ"""
     st.header("日誌入力")
-    st.info("このページを印刷するには、ブラウザの印刷機能（Windows/Linux: Ctrl + P, Mac: Cmd + P）をご利用ください。")
+    st.info("このページを印刷するには、画面右上の・・・からPrintをクリック")
     st.markdown("""
         <style>
             @media print {
@@ -820,7 +820,7 @@ def show_log_input_page():
 def show_excretion_page():
     """排泄入力ページ"""
     st.header("排泄入力")
-    st.info("このページを印刷するには、ブラウザの印刷機能（Windows/Linux: Ctrl + P, Mac: Cmd + P）をご利用ください。")
+    st.info("このページを印刷するには、画面右上の・・・からPrintをクリック")
     st.markdown("""
         <style>
             @media print {
@@ -975,7 +975,7 @@ def show_excretion_page():
 def show_absence_page():
     """欠席加算入力ページ"""
     st.header("欠席加算入力")
-    st.info("このページを印刷するには、ブラウザの印刷機能（Windows/Linux: Ctrl + P, Mac: Cmd + P）をご利用ください。")
+    st.info("このページを印刷するには、画面右上の・・・からPrintをクリック")
     st.markdown("""
         <style>
             @media print {
