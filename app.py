@@ -135,7 +135,6 @@ if not df_map.empty: # データが空でないことを確認
 # Streamlitに地図を表示 (folium_staticを使用)
 folium_static(m)
 
----
 
 # 4. 人口推移グラフ (棒グラフ)
 
