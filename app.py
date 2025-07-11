@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
 import folium
-from folium.plugins import MarkerCluster
+from streamlit_folium import folium_static # ここが重要！
 import plotly.express as px
 import numpy as np
+import datetime # 日付操作のために追加
 
 # --- 1. データ準備 (サンプルデータ) ---
 # 実際のデータに置き換えてください
@@ -12,18 +13,35 @@ def load_data():
     # 鹿児島市の区や町を想定したサンプル地区名
     districts = ['中央町', '天文館', '鴨池', '谷山', '伊敷', '桜ヶ丘']
     
-    # 2015年から2024年までの月ごとの人口データを生成
+    # 2015年1月から現在までの月ごとの人口データを生成
     # 実際にはCSVなどからロードします
     data = []
-    for year in range(2015, 2025):
+    # 現在の日付を取得
+    current_date = datetime.date.today()
+    
+    for year in range(2015, current_date.year + 1):
         for month in range(1, 13):
+            # 現在の年月を超えないように調整
+            if year == current_date.year and month > current_date.month:
+                break
+            
             date_str = f"{year}-{month:02d}"
             for district in districts:
                 # ランダムな人口データを生成（増減をシミュレート）
-                base_pop = 5000 + np.random.randint(-1000, 1000)
-                change = np.random.randint(-50, 50) # 月ごとの微細な変化
-                population = base_pop + (year - 2015) * 100 + change # 年々増加傾向の例
-                data.append({'年月': date_str, '地区名': district, '人口': max(1000, int(population))}) # 最低人口設定
+                # 初期人口と年ごとの傾向
+                initial_pop = np.random.randint(4000, 7000)
+                yearly_change = np.random.randint(-50, 150) # 年々増加傾向の例
+                
+                # 月ごとの微細な変動
+                monthly_fluctuation = np.random.randint(-100, 100)
+                
+                # 人口計算
+                population = initial_pop + (year - 2015) * yearly_change + monthly_fluctuation
+                
+                # 最低人口を設定（極端な減少を防ぐ）
+                population = max(1000, int(population)) 
+                
+                data.append({'年月': date_str, '地区名': district, '人口': population})
 
     df = pd.DataFrame(data)
     
@@ -62,7 +80,7 @@ selected_date = unique_months[selected_month_idx]
 st.subheader(f'選択中の年月: {selected_date.strftime("%Y年%m月")}')
 
 # --- 3. 地図の表示 ---
-st.subheader('地図上の人口増減')
+st.subheader('地図上の人口変動')
 
 # 選択された年月のデータにフィルタリング
 df_filtered = df[df['年月'] == selected_date]
@@ -72,43 +90,55 @@ df_map = pd.DataFrame(columns=['地区名', '人口', 'lat', 'lon'])
 for index, row in df_filtered.iterrows():
     district = row['地区名']
     if district in geo_data:
-        df_map = pd.concat([df_map, pd.DataFrame([{
-            '地区名': district,
-            '人口': row['人口'],
-            'lat': geo_data[district]['lat'],
-            'lon': geo_data[district]['lon']
-        }])], ignore_index=True)
+        # locを使ってDataFrameに行を追加する方法が推奨されます
+        df_map.loc[len(df_map)] = [
+            district,
+            row['人口'],
+            geo_data[district]['lat'],
+            geo_data[district]['lon']
+        ]
 
 # 地図の中心を鹿児島市役所付近に設定
 map_center = [31.5960, 130.5580]
 m = folium.Map(location=map_center, zoom_start=12)
 
-# マーカークラスターで人口を表示（棒グラフの代替表現）
-# 人口の増減をマーカーの色やサイズで表現することも可能
-# ここでは人口が多いほどマーカーの色を濃くする例
-min_pop = df_map['人口'].min()
-max_pop = df_map['人口'].max()
+# 人口に応じて円のサイズと色を変更するマーカーを追加
+if not df_map.empty: # データが空でないことを確認
+    min_pop = df_map['人口'].min()
+    max_pop = df_map['人口'].max()
 
-for idx, row in df_map.iterrows():
-    # 人口に応じた色のグラデーション（例: 青系のグラデーション）
-    normalized_pop = (row['人口'] - min_pop) / (max_pop - min_pop)
-    color_val = int(255 * (1 - normalized_pop)) # 人口が多いほど暗い青
-    color_hex = f'#{color_val:02x}{color_val:02x}FF' # BGR形式
+    for idx, row in df_map.iterrows():
+        # 人口に応じた色のグラデーション（例: 青系のグラデーション）
+        # 人口が少ないほど明るい青、多いほど濃い青
+        # 0.0-1.0に正規化し、それを255に掛けて色を計算
+        normalized_pop = (row['人口'] - min_pop) / (max_pop - min_pop) if (max_pop - min_pop) > 0 else 0.5
+        color_val_r = int(255 * (1 - normalized_pop))
+        color_val_g = int(255 * (1 - normalized_pop))
+        color_val_b = 255 # 青を強調
+        color_hex = f'#{color_val_r:02x}{color_val_g:02x}{color_val_b:02x}'
 
-    folium.CircleMarker(
-        location=[row['lat'], row['lon']],
-        radius=np.log(row['人口'] / 1000) * 5, # 人口に応じて円の大きさを調整（対数スケールで変化を緩やかに）
-        color=color_hex,
-        fill=True,
-        fill_color=color_hex,
-        fill_opacity=0.7,
-        tooltip=f"{row['地区名']}: 人口 {row['人口']}人"
-    ).add_to(m)
+        # 人口に応じて円の大きさを調整（対数スケールで変化を緩やかに）
+        # 最低人口を1000として、半径を計算
+        radius = np.log(max(row['人口'], 1000) / 1000) * 5 + 5 # 最低半径を5に設定
+        radius = max(5, radius) # 半径が小さくなりすぎないように
 
-# Streamlitに地図を表示
-st.write(m._repr_html_(), unsafe_allow_html=True)
+        folium.CircleMarker(
+            location=[row['lat'], row['lon']],
+            radius=radius,
+            color=color_hex,
+            fill=True,
+            fill_color=color_hex,
+            fill_opacity=0.7,
+            tooltip=f"{row['地区名']}: 人口 {row['人口']}人"
+        ).add_to(m)
 
-# --- 4. 人口推移グラフ (棒グラフ) ---
+# Streamlitに地図を表示 (folium_staticを使用)
+folium_static(m)
+
+---
+
+# 4. 人口推移グラフ (棒グラフ)
+
 st.subheader('選択地区の人口推移')
 
 # 全期間の人口推移グラフ
@@ -119,7 +149,7 @@ fig_line = px.line(df_total_pop_over_time,
                    x='年月', 
                    y='人口', 
                    title='鹿児島市全体の人口推移')
-fig_line.update_layout(xaxis_title="年月", yaxis_title="人口")
+fig_line.update_layout(xaxis_title="年月", yaxis_title="人口", hovermode="x unified")
 st.plotly_chart(fig_line, use_container_width=True)
 
 # 地区ごとの人口推移を見るための選択ボックス
@@ -132,7 +162,7 @@ if selected_district:
     fig_bar = px.bar(df_district_pop, 
                      x='年月', 
                      y='人口', 
-                     title=f'{selected_district}の人口推移')
+                     title=f'{selected_district}の人口推移',
+                     labels={'年月': '年月', '人口': '人口'})
     fig_bar.update_layout(xaxis_title="年月", yaxis_title="人口")
     st.plotly_chart(fig_bar, use_container_width=True)
-
