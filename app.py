@@ -71,7 +71,6 @@ st.write('年月スライダーを動かして、各地区の人口変動を見�
 # データフレームからユニークな年月を取得し、ソート
 unique_months = sorted(df['年月'].unique())
 
-# --- ここから修正 ---
 if len(unique_months) == 0:
     st.error("利用可能な年月データがありません。データ準備部分を確認してください。")
     st.stop() # データがない場合はここで処理を停止
@@ -88,7 +87,6 @@ else:
         value=default_slider_val,
         format_func=lambda x: unique_months[x].strftime('%Y年%m月')
     )
-# --- ここまで修正 ---
 
 selected_date = unique_months[selected_month_idx]
 
@@ -149,9 +147,10 @@ if not df_map.empty: # データが空でないことを確認
 # Streamlitに地図を表示 (folium_staticを使用)
 folium_static(m)
 
----
+# 水平線を追加
+st.markdown("---")
 
-# 4. 人口推移グラフ (棒グラフ)
+## 4. 人口推移グラフ (棒グラフ)
 
 st.subheader('選択地区の人口推移')
 
