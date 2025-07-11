@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import folium
-from streamlit_folium import folium_static # ここが重要！
+from streamlit_folium import folium_static
 import plotly.express as px
 import numpy as np
 import datetime # 日付操作のために追加
@@ -90,7 +90,7 @@ df_map = pd.DataFrame(columns=['地区名', '人口', 'lat', 'lon'])
 for index, row in df_filtered.iterrows():
     district = row['地区名']
     if district in geo_data:
-        # locを使ってDataFrameに行を追加する方法が推奨されます
+        # **ここを修正しました！** appendではなくlocを使用
         df_map.loc[len(df_map)] = [
             district,
             row['人口'],
@@ -134,6 +134,7 @@ if not df_map.empty: # データが空でないことを確認
 
 # Streamlitに地図を表示 (folium_staticを使用)
 folium_static(m)
+
 
 
 # 4. 人口推移グラフ (棒グラフ)
