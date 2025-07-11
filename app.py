@@ -80,17 +80,24 @@ else:
     max_slider_val = len(unique_months) - 1
     default_slider_val = len(unique_months) - 1 # 最新月を初期値に
 
+    # format_funcを明示的に定義
+    def format_slider_date(x):
+        return unique_months[x].strftime('%Y年%m月')
+
     selected_month_idx = st.slider(
         '年月を選択',
         min_value=min_slider_val,
         max_value=max_slider_val,
         value=default_slider_val,
-        format_func=lambda x: unique_months[x].strftime('%Y年%m月')
+        format_func=format_slider_date # 定義した関数を渡す
     )
 
 selected_date = unique_months[selected_month_idx]
 
 st.subheader(f'選択中の年月: {selected_date.strftime("%Y年%m月")}')
+
+# st.markdown("---")を追加
+st.markdown("---")
 
 # --- 3. 地図の表示 ---
 st.subheader('地図上の人口変動')
