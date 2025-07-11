@@ -46,7 +46,7 @@ def load_data():
     df = pd.DataFrame(data)
     
     # 年月のdatetime型変換
-    df['年月'] = pd.to_datetime(df['年月'])
+    df['年月'] = pd.to_datetime(df['年月']).dt.to_period('M').dt.to_timestamp() # 月の初日に変換してdatetime.datetime型を維持
     
     # 地区ごとの緯度経度データ (これも仮のデータ、実際はGeocodingなどが必要)
     # 鹿児島市役所付近を中心としたランダムな位置
@@ -68,32 +68,34 @@ st.title('鹿児島市 人口増減ダッシュボード')
 st.write('年月スライダーを動かして、各地区の人口変動を見てみよう！')
 
 # 年月スライダー
-# データフレームからユニークな年月を取得し、ソート
+# データフレームからユニークな年月を取得し、ソート (datetimeオブジェクトとして)
 unique_months = sorted(df['年月'].unique())
 
 if len(unique_months) == 0:
     st.error("利用可能な年月データがありません。データ準備部分を確認してください。")
     st.stop() # データがない場合はここで処理を停止
 else:
-    # スライダーのmin/max/初期値
-    min_slider_val = 0
-    max_slider_val = len(unique_months) - 1
-    default_slider_val = len(unique_months) - 1 # 最新月を初期値に
+    # unique_monthsの要素をdatetime.date型に変換（st.sliderが扱いやすいように）
+    # .to_pydatetime() で numpy.datetime64 から datetime.datetime に変換し、.date() で日付部分のみ取得
+    unique_dates = [pd.Timestamp(dt).to_pydatetime().date() for dt in unique_months]
+    
+    # スライダーのmin/max/初期値をdatetime.dateオブジェクトとして渡す
+    min_slider_date = unique_dates[0]
+    max_slider_date = unique_dates[-1]
+    default_slider_date = unique_dates[-1] # 最新月を初期値に
 
-    # format_funcを明示的に定義
-    def format_slider_date(x):
-        return unique_months[x].strftime('%Y年%m月')
-
-    selected_month_idx = st.slider(
+    # st.sliderはdatetimeオブジェクトを直接受け取れるため、format引数は不要（またはシンプルに）
+    # format引数を削除するか、日付フォーマット文字列に設定
+    selected_date_from_slider = st.slider(
         '年月を選択',
-        min_value=min_slider_val,
-        max_value=max_slider_val,
-        value=default_slider_val,
-        # ここを format_func から format に修正しました！
-        format=format_slider_date 
+        min_value=min_slider_date,
+        max_value=max_slider_date,
+        value=default_slider_date,
+        # format="%Y年%m月" # formatを文字列として渡す
     )
 
-selected_date = unique_months[selected_month_idx]
+# スライダーで選択されたdatetime.dateオブジェクトを元に、dfをフィルタリングするためのdatetime.datetimeオブジェクトを生成
+selected_date = pd.to_datetime(selected_date_from_slider) # datetime.dateからdatetime.datetimeへ変換
 
 st.subheader(f'選択中の年月: {selected_date.strftime("%Y年%m月")}')
 
@@ -103,7 +105,11 @@ st.markdown("---")
 st.subheader('地図上の人口変動')
 
 # 選択された年月のデータにフィルタリング
-df_filtered = df[df['年月'] == selected_date]
+# 月のデータなので、年と月が一致する行を抽出
+df_filtered = df[
+    (df['年月'].dt.year == selected_date.year) & 
+    (df['年月'].dt.month == selected_date.month)
+]
 
 # 各地区の緯度経度を結合
 df_map = pd.DataFrame(columns=['地区名', '人口', 'lat', 'lon'])
