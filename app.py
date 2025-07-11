@@ -17,7 +17,7 @@ def load_data():
     # 実際にはCSVなどからロードします
     data = []
     # 現在の日付を取得
-    current_date = datetime.date.today()
+    current_date = datetime.date.today() # 実行時点の最新日付
     
     for year in range(2015, current_date.year + 1):
         for month in range(1, 13):
@@ -89,14 +89,14 @@ else:
         min_value=min_slider_val,
         max_value=max_slider_val,
         value=default_slider_val,
-        format_func=format_slider_date # 定義した関数を渡す
+        # ここを format_func から format に修正しました！
+        format=format_slider_date 
     )
 
 selected_date = unique_months[selected_month_idx]
 
 st.subheader(f'選択中の年月: {selected_date.strftime("%Y年%m月")}')
 
-# st.markdown("---")を追加
 st.markdown("---")
 
 # --- 3. 地図の表示 ---
@@ -154,7 +154,6 @@ if not df_map.empty: # データが空でないことを確認
 # Streamlitに地図を表示 (folium_staticを使用)
 folium_static(m)
 
-# 水平線を追加
 st.markdown("---")
 
 ## 4. 人口推移グラフ (棒グラフ)
