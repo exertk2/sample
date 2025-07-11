@@ -4,7 +4,7 @@ import folium
 from streamlit_folium import folium_static
 import plotly.express as px
 import numpy as np
-import datetime # 日付操作のために追加
+import datetime
 
 # --- 1. データ準備 (サンプルデータ) ---
 # 実際のデータに置き換えてください
@@ -70,11 +70,26 @@ st.write('年月スライダーを動かして、各地区の人口変動を見�
 # 年月スライダー
 # データフレームからユニークな年月を取得し、ソート
 unique_months = sorted(df['年月'].unique())
-selected_month_idx = st.slider(
-    '年月を選択',
-    0, len(unique_months) - 1, len(unique_months) - 1, # 初期値を最新月に設定
-    format_func=lambda x: unique_months[x].strftime('%Y年%m月')
-)
+
+# --- ここから修正 ---
+if len(unique_months) == 0:
+    st.error("利用可能な年月データがありません。データ準備部分を確認してください。")
+    st.stop() # データがない場合はここで処理を停止
+else:
+    # スライダーのmin/max/初期値
+    min_slider_val = 0
+    max_slider_val = len(unique_months) - 1
+    default_slider_val = len(unique_months) - 1 # 最新月を初期値に
+
+    selected_month_idx = st.slider(
+        '年月を選択',
+        min_value=min_slider_val,
+        max_value=max_slider_val,
+        value=default_slider_val,
+        format_func=lambda x: unique_months[x].strftime('%Y年%m月')
+    )
+# --- ここまで修正 ---
+
 selected_date = unique_months[selected_month_idx]
 
 st.subheader(f'選択中の年月: {selected_date.strftime("%Y年%m月")}')
@@ -90,7 +105,6 @@ df_map = pd.DataFrame(columns=['地区名', '人口', 'lat', 'lon'])
 for index, row in df_filtered.iterrows():
     district = row['地区名']
     if district in geo_data:
-        # **ここを修正しました！** appendではなくlocを使用
         df_map.loc[len(df_map)] = [
             district,
             row['人口'],
@@ -135,7 +149,7 @@ if not df_map.empty: # データが空でないことを確認
 # Streamlitに地図を表示 (folium_staticを使用)
 folium_static(m)
 
-
+---
 
 # 4. 人口推移グラフ (棒グラフ)
 
