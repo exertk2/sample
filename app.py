@@ -91,7 +91,7 @@ else:
         min_value=min_slider_date,
         max_value=max_slider_date,
         value=default_slider_date,
-        # format="%Y年%m月" # formatを文字列として渡す
+        # format="%Y年%m月" # この行をコメントアウトしたことで、構文エラーが解消されるはずです
     )
 
 # スライダーで選択されたdatetime.dateオブジェクトを元に、dfをフィルタリングするためのdatetime.datetimeオブジェクトを生成
