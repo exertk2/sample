@@ -9,36 +9,37 @@ import sqlite3
 import os # ファイルの存在チェックのためにosモジュールをインポート
 
 # --- データベースの作成とデータ投入関数 ---
-def create_and_populate_db(db_name='population_data.db'):
+def create_and_populate_db(db_name='school_data.db'):
     conn = None
     try:
         conn = sqlite3.connect(db_name)
         cursor = conn.cursor()
 
-        # 地区ごとの緯度経度データ (データ生成時に使用)
+        # 学校ごとの緯度経度データ (データ生成時に使用)
         geo_data_map = {
-            '中央町': {'lat': 31.5959, 'lon': 130.5586},
-            '天文館': {'lat': 31.5901, 'lon': 130.5562},
-            '鴨池': {'lat': 31.5650, 'lon': 130.5470},
-            '谷山': {'lat': 31.5000, 'lon': 130.4900},
-            '伊敷': {'lat': 31.6200, 'lon': 130.5400},
-            '桜ヶ丘': {'lat': 31.5400, 'lon': 130.5200}
+            '中央小学校': {'lat': 31.5959, 'lon': 130.5586},
+            '天文館小学校': {'lat': 31.5901, 'lon': 130.5562},
+            '鴨池小学校': {'lat': 31.5650, 'lon': 130.5470},
+            '谷山小学校': {'lat': 31.5000, 'lon': 130.4900},
+            '伊敷小学校': {'lat': 31.6200, 'lon': 130.5400},
+            '桜ヶ丘小学校': {'lat': 31.5400, 'lon': 130.5200}
         }
 
-        # population_tableの作成 (緯度経度カラムを含む)
+        # school_data_tableの作成 (緯度経度、児童生徒数、特別支援学級人数カラムを含む)
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS population_table (
+            CREATE TABLE IF NOT EXISTS school_data_table (
                 年月 TEXT NOT NULL,
-                地区名 TEXT NOT NULL,
-                人口 INTEGER NOT NULL,
+                学校名 TEXT NOT NULL,
+                児童生徒数 INTEGER NOT NULL,
+                特別支援学級人数 INTEGER NOT NULL,
                 lat REAL NOT NULL,
                 lon REAL NOT NULL,
-                PRIMARY KEY (年月, 地区名) -- 年月と地区名の組み合わせをユニークにする
+                PRIMARY KEY (年月, 学校名) -- 年月と学校名の組み合わせをユニークにする
             )
         ''')
 
-        # サンプル人口データの生成
-        districts = list(geo_data_map.keys()) # 緯度経度データにある地区名を使用
+        # サンプル学校データ (児童生徒数と特別支援学級人数) の生成
+        schools = list(geo_data_map.keys()) # 緯度経度データにある学校名を使用
         data = []
         current_date = datetime.date.today()
 
@@ -47,26 +48,29 @@ def create_and_populate_db(db_name='population_data.db'):
                 if year == current_date.year and month > current_date.month:
                     break
                 date_str = f"{year}-{month:02d}"
-                for district in districts:
-                    initial_pop = np.random.randint(4000, 7000)
-                    yearly_change = np.random.randint(-50, 150)
-                    monthly_fluctuation = np.random.randint(-100, 100)
-                    population = initial_pop + (year - 2015) * yearly_change + monthly_fluctuation
-                    population = max(1000, int(population))
+                for school in schools:
+                    initial_students = np.random.randint(300, 800)
+                    yearly_student_change = np.random.randint(-20, 30)
+                    monthly_student_fluctuation = np.random.randint(-50, 50)
                     
-                    # 緯度経度を取得
-                    lat = geo_data_map[district]['lat']
-                    lon = geo_data_map[district]['lon']
-                    
-                    data.append((date_str, district, population, lat, lon))
+                    student_count = initial_students + (year - 2015) * yearly_student_change + monthly_student_fluctuation
+                    student_count = max(100, int(student_count)) # 最低児童生徒数
 
-        # 人口データを挿入 (INSERT OR IGNORE で重複を避ける)
-        cursor.execute("SELECT COUNT(*) FROM population_table")
+                    special_support_class_size = np.random.randint(5, 30) # 特別支援学級人数
+
+                    # 緯度経度を取得
+                    lat = geo_data_map[school]['lat']
+                    lon = geo_data_map[school]['lon']
+                    
+                    data.append((date_str, school, student_count, special_support_class_size, lat, lon))
+
+        # データを挿入 (INSERT OR IGNORE で重複を避ける)
+        cursor.execute("SELECT COUNT(*) FROM school_data_table")
         if cursor.fetchone()[0] == 0: # テーブルが空の場合のみ挿入
-            cursor.executemany("INSERT OR IGNORE INTO population_table (年月, 地区名, 人口, lat, lon) VALUES (?, ?, ?, ?, ?)", data)
-            st.success("人口データと緯度経度データがデータベースに投入されました。")
+            cursor.executemany("INSERT OR IGNORE INTO school_data_table (年月, 学校名, 児童生徒数, 特別支援学級人数, lat, lon) VALUES (?, ?, ?, ?, ?, ?)", data)
+            st.success("児童生徒数、特別支援学級人数、緯度経度データがデータベースに投入されました。")
         else:
-            st.info("人口データは既にデータベースに存在します。スキップしました。")
+            st.info("学校データは既にデータベースに存在します。スキップしました。")
 
         conn.commit()
         
@@ -78,7 +82,7 @@ def create_and_populate_db(db_name='population_data.db'):
 
 # --- データロード関数 (SQLiteから) ---
 @st.cache_data
-def load_data_from_sqlite(db_name='population_data.db'):
+def load_data_from_sqlite(db_name='school_data.db'):
     conn = None
     df = pd.DataFrame() # dfを空のDataFrameで初期化
 
@@ -86,8 +90,8 @@ def load_data_from_sqlite(db_name='population_data.db'):
         conn = sqlite3.connect(db_name) 
         
         # 統合されたテーブルからデータを取得
-        query_population = "SELECT 年月, 地区名, 人口, lat, lon FROM population_table"
-        df = pd.read_sql_query(query_population, conn)
+        query_school_data = "SELECT 年月, 学校名, 児童生徒数, 特別支援学級人数, lat, lon FROM school_data_table"
+        df = pd.read_sql_query(query_school_data, conn)
         
         # 年月のdatetime型変換 ('YYYY-MM' 形式を想定)
         df['年月'] = pd.to_datetime(df['年月']).dt.to_period('M').dt.to_timestamp()
@@ -102,7 +106,7 @@ def load_data_from_sqlite(db_name='population_data.db'):
     return df
 
 # --- アプリケーションのメイン処理 ---
-DB_NAME = 'population_data.db'
+DB_NAME = 'school_data.db'
 
 # データベースファイルが存在しない場合、または空の場合に作成・投入
 if not os.path.exists(DB_NAME) or os.path.getsize(DB_NAME) == 0:
@@ -112,11 +116,11 @@ else:
     st.info(f"'{DB_NAME}' が存在します。既存のデータベースを使用します。")
 
 # データをロード
-df = load_data_from_sqlite(DB_NAME) # geo_dataは別途返されない
+df = load_data_from_sqlite(DB_NAME) 
 
 # --- 2. Streamlit UI ---
-st.title('鹿児島市 人口増減ダッシュボード')
-st.write('年月スライダーを動かして、各地区の人口変動を見てみよう！')
+st.title('鹿児島市 児童生徒数ダッシュボード')
+st.write('年月スライダーを動かして、各学校の児童生徒数と特別支援学級人数の変動を見てみよう！')
 
 # 年月スライダー
 if df.empty:
@@ -149,7 +153,7 @@ st.subheader(f'選択中の年月: {selected_date.strftime("%Y年%m月")}')
 st.markdown("---")
 
 # --- 3. 地図の表示 ---
-st.subheader('地図上の人口変動')
+st.subheader('地図上の児童生徒数変動')
 
 df_filtered = df[
     (df['年月'].dt.year == selected_date.year) & 
@@ -157,25 +161,27 @@ df_filtered = df[
 ].copy() # SettingWithCopyWarningを避けるために.copy()を使用
 
 # df_mapを直接df_filteredから作成 (latとlonが既に含まれているため)
-# 地区名、人口、lat、lonカラムをそのまま使用
-df_map = df_filtered[['地区名', '人口', 'lat', 'lon']]
-
+# 学校名、児童生徒数、特別支援学級人数、lat、lonカラムをそのまま使用
+df_map = df_filtered[['学校名', '児童生徒数', '特別支援学級人数', 'lat', 'lon']]
 
 map_center = [31.5960, 130.5580]
 m = folium.Map(location=map_center, zoom_start=12)
 
 if not df_map.empty:
-    min_pop = df_map['人口'].min()
-    max_pop = df_map['人口'].max()
+    min_students = df_map['児童生徒数'].min()
+    max_students = df_map['児童生徒数'].max()
 
     for idx, row in df_map.iterrows():
-        normalized_pop = (row['人口'] - min_pop) / (max_pop - min_pop) if (max_pop - min_pop) > 0 else 0.5
-        color_val_r = int(255 * (1 - normalized_pop))
-        color_val_g = int(255 * (1 - normalized_pop))
+        normalized_students = (row['児童生徒数'] - min_students) / (max_students - min_students) if (max_students - min_students) > 0 else 0.5
+        
+        # 色を児童生徒数に基づいて調整 (例: 児童生徒数が多いほど青みが濃くなる)
+        color_val_r = int(255 * (1 - normalized_students))
+        color_val_g = int(255 * (1 - normalized_students))
         color_val_b = 255
         color_hex = f'#{color_val_r:02x}{color_val_g:02x}{color_val_b:02x}'
 
-        radius = np.log(max(row['人口'], 1000) / 1000) * 5 + 5
+        # 円の半径を児童生徒数に基づいて調整
+        radius = np.log(max(row['児童生徒数'], 100) / 100) * 5 + 5
         radius = max(5, radius)
 
         folium.CircleMarker(
@@ -185,40 +191,47 @@ if not df_map.empty:
             fill=True,
             fill_color=color_hex,
             fill_opacity=0.7,
-            tooltip=f"{row['地区名']}: 人口 {row['人口']}人"
+            tooltip=f"{row['学校名']}: 児童生徒数 {row['児童生徒数']}人, 特別支援学級人数 {row['特別支援学級人数']}人"
         ).add_to(m)
 
 folium_static(m)
 
 st.markdown("---")
 
-# --- 4. 人口推移グラフ ---
+# --- 4. 児童生徒数推移グラフ ---
 
-st.subheader('選択地区の人口推移')
+st.subheader('選択学校の児童生徒数推移')
 
-df_total_pop_over_time = df.groupby('年月')['人口'].sum().reset_index()
+df_total_students_over_time = df.groupby('年月')['児童生徒数'].sum().reset_index()
 
-fig_line = px.line(df_total_pop_over_time, 
+fig_line_students = px.line(df_total_students_over_time, 
                    x='年月', 
-                   y='人口', 
-                   title='鹿児島市全体の人口推移')
-fig_line.update_layout(xaxis_title="年月", yaxis_title="人口", hovermode="x unified")
-st.plotly_chart(fig_line, use_container_width=True)
+                   y='児童生徒数', 
+                   title='鹿児島市全体の児童生徒数推移')
+fig_line_students.update_layout(xaxis_title="年月", yaxis_title="児童生徒数", hovermode="x unified")
+st.plotly_chart(fig_line_students, use_container_width=True)
 
 if not df.empty:
-    selected_district = st.selectbox('詳細を見たい地区を選択', df['地区名'].unique())
+    selected_school = st.selectbox('詳細を見たい学校を選択', df['学校名'].unique())
 
-    if selected_district:
-        df_district_pop = df[df['地区名'] == selected_district].sort_values('年月')
+    if selected_school:
+        df_school_data = df[df['学校名'] == selected_school].sort_values('年月')
         
-        fig_bar = px.bar(df_district_pop, 
+        fig_bar_students = px.bar(df_school_data, 
                         x='年月', 
-                        y='人口', 
-                        title=f'{selected_district}の人口推移',
-                        labels={'年月': '年月', '人口': '人口'})
-        fig_bar.update_layout(xaxis_title="年月", yaxis_title="人口")
-        st.plotly_chart(fig_bar, use_container_width=True)
+                        y='児童生徒数', 
+                        title=f'{selected_school}の児童生徒数推移',
+                        labels={'年月': '年月', '児童生徒数': '児童生徒数'})
+        fig_bar_students.update_layout(xaxis_title="年月", yaxis_title="児童生徒数")
+        st.plotly_chart(fig_bar_students, use_container_width=True)
+
+        fig_bar_special = px.bar(df_school_data, 
+                        x='年月', 
+                        y='特別支援学級人数', 
+                        title=f'{selected_school}の特別支援学級人数推移',
+                        labels={'年月': '年月', '特別支援学級人数': '特別支援学級人数'})
+        fig_bar_special.update_layout(xaxis_title="年月", yaxis_title="特別支援学級人数")
+        st.plotly_chart(fig_bar_special, use_container_width=True)
+
 else:
-    st.info("人口推移グラフを表示するためのデータがありません。")
-
-
+    st.info("児童生徒数推移グラフを表示するためのデータがありません。")
