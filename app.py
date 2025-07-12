@@ -112,7 +112,7 @@ DB_NAME = 'school_data.db'
 if not os.path.exists(DB_NAME) or os.path.getsize(DB_NAME) == 0:
     st.info(f"'{DB_NAME}' が見つからないか空です。データベースを作成し、データを投入します。")
     create_and_populate_db(DB_NAME)
-else:
+# else:
 #    st.info(f"'{DB_NAME}' が存在します。既存のデータベースを使用します。")
 
 # データをロード
