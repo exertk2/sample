@@ -15,26 +15,30 @@ def create_and_populate_db(db_name='population_data.db'):
         conn = sqlite3.connect(db_name)
         cursor = conn.cursor()
 
-        # population_tableの作成
+        # 地区ごとの緯度経度データ (データ生成時に使用)
+        geo_data_map = {
+            '中央町': {'lat': 31.5959, 'lon': 130.5586},
+            '天文館': {'lat': 31.5901, 'lon': 130.5562},
+            '鴨池': {'lat': 31.5650, 'lon': 130.5470},
+            '谷山': {'lat': 31.5000, 'lon': 130.4900},
+            '伊敷': {'lat': 31.6200, 'lon': 130.5400},
+            '桜ヶ丘': {'lat': 31.5400, 'lon': 130.5200}
+        }
+
+        # population_tableの作成 (緯度経度カラムを含む)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS population_table (
                 年月 TEXT NOT NULL,
                 地区名 TEXT NOT NULL,
-                人口 INTEGER NOT NULL
-            )
-        ''')
-
-        # district_geodataテーブルの作成 (緯度経度用)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS district_geodata (
-                地区名 TEXT NOT NULL UNIQUE,
+                人口 INTEGER NOT NULL,
                 lat REAL NOT NULL,
-                lon REAL NOT NULL
+                lon REAL NOT NULL,
+                PRIMARY KEY (年月, 地区名) -- 年月と地区名の組み合わせをユニークにする
             )
         ''')
 
-        # サンプル人口データの生成 (元のapp.pyのロジックに類似)
-        districts = ['中央町', '天文館', '鴨池', '谷山', '伊敷', '桜ヶ丘']
+        # サンプル人口データの生成
+        districts = list(geo_data_map.keys()) # 緯度経度データにある地区名を使用
         data = []
         current_date = datetime.date.today()
 
@@ -49,36 +53,20 @@ def create_and_populate_db(db_name='population_data.db'):
                     monthly_fluctuation = np.random.randint(-100, 100)
                     population = initial_pop + (year - 2015) * yearly_change + monthly_fluctuation
                     population = max(1000, int(population))
-                    data.append((date_str, district, population))
+                    
+                    # 緯度経度を取得
+                    lat = geo_data_map[district]['lat']
+                    lon = geo_data_map[district]['lon']
+                    
+                    data.append((date_str, district, population, lat, lon))
 
-        # 人口データを挿入
-        # 既にデータがある場合はスキップするために、INSERT OR IGNORE を使用
-        # ただし、このサンプルでは毎回全期間のデータを生成するため、
-        # 重複挿入を避けるには、まず既存データをクリアするか、より複雑なロジックが必要です。
-        # 簡単のため、ここでは毎回挿入を試みますが、実運用では注意が必要です。
-        # 既存データがあるか確認し、なければ挿入するロジックを追加
+        # 人口データを挿入 (INSERT OR IGNORE で重複を避ける)
         cursor.execute("SELECT COUNT(*) FROM population_table")
         if cursor.fetchone()[0] == 0: # テーブルが空の場合のみ挿入
-            cursor.executemany("INSERT INTO population_table (年月, 地区名, 人口) VALUES (?, ?, ?)", data)
-            st.success("人口データがデータベースに投入されました。")
+            cursor.executemany("INSERT OR IGNORE INTO population_table (年月, 地区名, 人口, lat, lon) VALUES (?, ?, ?, ?, ?)", data)
+            st.success("人口データと緯度経度データがデータベースに投入されました。")
         else:
             st.info("人口データは既にデータベースに存在します。スキップしました。")
-
-
-        # 地理データを挿入
-        geo_data_for_db = [
-            ('中央町', 31.5959, 130.5586),
-            ('天文館', 31.5901, 130.5562),
-            ('鴨池', 31.5650, 130.5470),
-            ('谷山', 31.5000, 130.4900),
-            ('伊敷', 31.6200, 130.5400),
-            ('桜ヶ丘', 31.5400, 130.5200)
-        ]
-
-        # 地理データは重複を避けるため INSERT OR REPLACE を使用
-        for district, lat, lon in geo_data_for_db:
-            cursor.execute("INSERT OR REPLACE INTO district_geodata (地区名, lat, lon) VALUES (?, ?, ?)", (district, lat, lon))
-        st.success("地区の緯度経度データがデータベースに投入または更新されました。")
 
         conn.commit()
         
@@ -93,35 +81,25 @@ def create_and_populate_db(db_name='population_data.db'):
 def load_data_from_sqlite(db_name='population_data.db'):
     conn = None
     df = pd.DataFrame() # dfを空のDataFrameで初期化
-    geo_data = {} # geo_dataを空の辞書で初期化
 
     try:
         conn = sqlite3.connect(db_name) 
         
-        # 人口データを取得
-        query_population = "SELECT 年月, 地区名, 人口 FROM population_table"
+        # 統合されたテーブルからデータを取得
+        query_population = "SELECT 年月, 地区名, 人口, lat, lon FROM population_table"
         df = pd.read_sql_query(query_population, conn)
         
         # 年月のdatetime型変換 ('YYYY-MM' 形式を想定)
         df['年月'] = pd.to_datetime(df['年月']).dt.to_period('M').dt.to_timestamp()
         
-        # 緯度経度データを取得
-        query_geodata = "SELECT 地区名, lat, lon FROM district_geodata"
-        df_geodata = pd.read_sql_query(query_geodata, conn)
-
-        # 緯度経度データを辞書形式に変換
-        geo_data = {row['地区名']: {'lat': row['lat'], 'lon': row['lon']} 
-                    for index, row in df_geodata.iterrows()}
-        
     except sqlite3.Error as e:
         st.error(f"データベースからのデータロードエラー: {e}")
         df = pd.DataFrame() 
-        geo_data = {}
     finally:
         if conn:
             conn.close()
     
-    return df, geo_data
+    return df
 
 # --- アプリケーションのメイン処理 ---
 DB_NAME = 'population_data.db'
@@ -134,7 +112,7 @@ else:
     st.info(f"'{DB_NAME}' が存在します。既存のデータベースを使用します。")
 
 # データをロード
-df, geo_data = load_data_from_sqlite(DB_NAME)
+df = load_data_from_sqlite(DB_NAME) # geo_dataは別途返されない
 
 # --- 2. Streamlit UI ---
 st.title('鹿児島市 人口増減ダッシュボード')
@@ -176,22 +154,12 @@ st.subheader('地図上の人口変動')
 df_filtered = df[
     (df['年月'].dt.year == selected_date.year) & 
     (df['年月'].dt.month == selected_date.month)
-]
+].copy() # SettingWithCopyWarningを避けるために.copy()を使用
 
-if not geo_data:
-    st.warning("緯度経度データがロードされませんでした。地図を表示できません。")
-    df_map = pd.DataFrame() 
-else:
-    df_map = pd.DataFrame(columns=['地区名', '人口', 'lat', 'lon'])
-    for index, row in df_filtered.iterrows():
-        district = row['地区名']
-        if district in geo_data:
-            df_map.loc[len(df_map)] = [
-                district,
-                row['人口'],
-                geo_data[district]['lat'],
-                geo_data[district]['lon']
-            ]
+# df_mapを直接df_filteredから作成 (latとlonが既に含まれているため)
+# 地区名、人口、lat、lonカラムをそのまま使用
+df_map = df_filtered[['地区名', '人口', 'lat', 'lon']]
+
 
 map_center = [31.5960, 130.5580]
 m = folium.Map(location=map_center, zoom_start=12)
