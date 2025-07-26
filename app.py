@@ -849,3 +849,6 @@ if st.session_state.current_view == 'map_view':
 
 elif st.session_state.current_view == 'edit_view':
     edit_coordinates_screen(df_school)
+
+st.info("免責事項:本アプリケーションの利用により生じたいかなる種類の損害、損失、不利益に対しても、開発者は一切の責任を負いません。本アプリケーションは現状有姿で提供され、開発者はその完全性、正確性、信頼性、特定の目的への適合性について、いかなる保証も行いません。利用者は、本アプリケーションの利用から生じる可能性のあるすべてのリスクを認識し、自己の責任において利用するものとします。")
+
