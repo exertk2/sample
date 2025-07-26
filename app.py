@@ -635,7 +635,7 @@ if st.session_state.current_view == 'map_view':
                     fill=True,
                     fill_color=color_hex,
                     fill_opacity=0.7,
-                    tooltip=f"{row['School_Name']}: 児童生徒数 {row['Student_Count']}人, 特別支援学級人数 {row['Special_Support_Class_Size']}人"
+                    tooltip=f"{row['School_Name']}<br>児童生徒数 {row['Student_Count']}人<br>特別支援学級人数 {row['Special_Support_Class_Size']}人"
                 ).add_to(m)
 
         if not df_sfkopendata_filtered.empty:
@@ -694,14 +694,14 @@ if st.session_state.current_view == 'map_view':
                 google_maps_url = f"https://www.google.com/maps/search/?api=1&query={st.session_state['clicked_lat']},{st.session_state['clicked_lon']}"
                 st.markdown(f"[Googleマップで開く]({google_maps_url})", unsafe_allow_html=True)
         
-        if 'map_click_info' in st.session_state:
-            info = st.session_state['map_click_info']
-            if info:
-                st.markdown(f"### クリックされた事業所情報")
-                st.markdown(f"**内容:** {info['tooltip']}", unsafe_allow_html=True)
-                st.markdown(f"**緯度:** {info['lat']:.4f}, **経度:** {info['lon']:.4f}")
-                st.markdown(f"[Googleマップで開く]({info['mapLink']})", unsafe_allow_html=True)
-                del st.session_state['map_click_info']
+        # if 'map_click_info' in st.session_state:
+        #     info = st.session_state['map_click_info']
+        #     if info:
+        #         st.markdown(f"### クリックされた事業所情報")
+        #         st.markdown(f"**内容:** {info['tooltip']}", unsafe_allow_html=True)
+        #         st.markdown(f"**緯度:** {info['lat']:.4f}, **経度:** {info['lon']:.4f}")
+        #         st.markdown(f"[Googleマップで開く]({info['mapLink']})", unsafe_allow_html=True)
+        #         del st.session_state['map_click_info']
 
 
     with col2:
