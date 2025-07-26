@@ -282,7 +282,7 @@ def edit_coordinates_screen(df_school_data_full):
     # パスワード認証
     if not st.session_state.get('password_correct_edit_screen', False):
         password = st.text_input("パスワードを入力してください", type="password", key="edit_password_input")
-        if password == "4861":
+        if password == "yR9$91k7VBjnfP*lqtQ$":
             st.session_state.password_correct_edit_screen = True
             st.success("認証成功！")
             st.rerun()
