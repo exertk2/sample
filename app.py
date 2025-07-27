@@ -294,7 +294,7 @@ def edit_coordinates_screen(df_school_data_full):
     st.write("学校の緯度と経度を修正できます。")
 
     st.subheader('検索条件')
-    
+
     # 検索条件を4列に配置
     col_search1, col_search2, col_search3, col_search4 = st.columns(4)
 
@@ -302,7 +302,7 @@ def edit_coordinates_screen(df_school_data_full):
         # 年月セレクトボックス
         unique_months_edit = sorted(df_school_data_full['Date'].unique(), reverse=True)
         month_options_edit = [pd.Timestamp(dt).strftime("%Y年%m月") for dt in unique_months_edit]
-        
+
         default_month_index_edit = 0
         if 'selected_month_index_edit' not in st.session_state:
             st.session_state.selected_month_index_edit = default_month_index_edit
@@ -356,7 +356,7 @@ def edit_coordinates_screen(df_school_data_full):
 
     if selected_city_edit != 'なし':
         df_edit_filtered = df_edit_filtered[df_edit_filtered['City'] == selected_city_edit]
-    
+
     if selected_school_name_edit != 'なし':
         df_edit_filtered = df_edit_filtered[df_edit_filtered['School_Name'] == selected_school_name_edit]
 
@@ -652,7 +652,7 @@ if st.session_state.current_view == 'map_view':
                         var lat = {row['事業所緯度']};
                         var lon = {row['事業所経度']};
                         var mapLink = `https://www.google.com/maps/search/?api=1&query={row['事業所緯度']},{row['事業所経度']}`;
-                        
+
                         window.parent.postMessage({{
                             type: 'streamlit:setComponentValue',
                             key: 'map_click_info',
@@ -684,16 +684,16 @@ if st.session_state.current_view == 'map_view':
 
         map_data = st_folium(m, width=1024, height=768, returned_objects=['last_object_clicked'], key="folium_map")
 
-        if map_data and map_data.get('last_object_clicked'):
-            clicked_obj = map_data['last_object_clicked']
-            if clicked_obj and clicked_obj.get('lat') is not None and clicked_obj.get('lng') is not None:
-                st.session_state['clicked_lat'] = clicked_obj['lat']
-                st.session_state['clicked_lon'] = clicked_obj['lng']
-                st.markdown(f"### クリックされた事業所情報")
-                st.markdown(f"**緯度:** {st.session_state['clicked_lat']:.4f}, **経度:** {st.session_state['clicked_lon']:.4f}")
-                google_maps_url = f"https://www.google.com/maps/search/?api=1&query={st.session_state['clicked_lat']},{st.session_state['clicked_lon']}"
-                st.markdown(f"[Googleマップで開く]({google_maps_url})", unsafe_allow_html=True)
-        
+        # if map_data and map_data.get('last_object_clicked'):
+        #     clicked_obj = map_data['last_object_clicked']
+        #     if clicked_obj and clicked_obj.get('lat') is not None and clicked_obj.get('lng') is not None:
+        #         st.session_state['clicked_lat'] = clicked_obj['lat']
+        #         st.session_state['clicked_lon'] = clicked_obj['lng']
+        #         st.markdown(f"### クリックされた事業所情報")
+        #         st.markdown(f"**緯度:** {st.session_state['clicked_lat']:.4f}, **経度:** {st.session_state['clicked_lon']:.4f}")
+        #         google_maps_url = f"https://www.google.com/maps/search/?api=1&query={st.session_state['clicked_lat']},{st.session_state['clicked_lon']}"
+        #         st.markdown(f"[Googleマップで開く]({google_maps_url})", unsafe_allow_html=True)
+
         # if 'map_click_info' in st.session_state:
         #     info = st.session_state['map_click_info']
         #     if info:
@@ -850,6 +850,3 @@ if st.session_state.current_view == 'map_view':
 
 elif st.session_state.current_view == 'edit_view':
     edit_coordinates_screen(df_school)
-
-
-
