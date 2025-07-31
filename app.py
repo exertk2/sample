@@ -628,7 +628,7 @@ if st.session_state.current_view == 'map_view':
                 location=[row['lat'], row['lon']],
                 radius=radius,
                 color='blue', # Changed to blue for schools to distinguish from red for businesses
-                weight=0.5,
+                weight=1,
                 fill=True,
                 fill_color=color_hex,
                 fill_opacity=0.7,
