@@ -608,144 +608,139 @@ if st.session_state.current_view == 'map_view':
         df_sfkopendata_filtered = df_sfkopendata_filtered[0:0]
 
 
-    # --- 3. 地図と凡例の表示を横に並べる ---
-    # col1, col2 = st.columns([3, 1])
+    # --- 3. 地図と凡例 ---
+    df_map = df_filtered[['School_Name', 'Student_Count', 'Special_Support_Class_Size', 'lat', 'lon']]
 
-    # with col1:
-        df_map = df_filtered[['School_Name', 'Student_Count', 'Special_Support_Class_Size', 'lat', 'lon']]
+    map_center = [31.5960, 130.5580]
+    m = folium.Map(location=map_center, zoom_start=9)
 
-        map_center = [31.5960, 130.5580]
-        m = folium.Map(location=map_center, zoom_start=9)
+    if not df_map.empty:
+        min_students = df_map['Student_Count'].min()
+        max_students = df_map['Student_Count'].max()
 
-        if not df_map.empty:
-            min_students = df_map['Student_Count'].min()
-            max_students = df_map['Student_Count'].max()
+        for idx, row in df_map.iterrows():
+            color_hex = get_color_for_students(row['Student_Count'], min_students, max_students)
 
-            for idx, row in df_map.iterrows():
-                color_hex = get_color_for_students(row['Student_Count'], min_students, max_students)
+            radius = np.log(max(row['Student_Count'], 100) / 100) * 5 + 5
+            radius = max(5, radius)
 
-                radius = np.log(max(row['Student_Count'], 100) / 100) * 5 + 5
-                radius = max(5, radius)
+            folium.CircleMarker(
+                location=[row['lat'], row['lon']],
+                radius=radius,
+                color='red',
+                weight=0.5,
+                fill=True,
+                fill_color=color_hex,
+                fill_opacity=0.7,
+                tooltip=f"{row['School_Name']}<br>児童生徒数 {row['Student_Count']}人<br>特別支援学級人数 {row['Special_Support_Class_Size']}人"
+            ).add_to(m)
 
+    if not df_sfkopendata_filtered.empty:
+        for idx, row in df_sfkopendata_filtered.iterrows():
+            if pd.notna(row['事業所緯度']) and pd.notna(row['事業所経度']):
+                popup_html = f"""
+                <b>法人名:</b> {row['法人の名称']}<br>
+                <b>事業所名:</b> {row['事業所の名称']}<br>
+                <b>サービス種別:</b> {row['サービス種別']}<br>
+                <b>住所:</b> {row['事業所住所（市区町村）']}{row['事業所住所（番地以降）']}<br>
+                <b>定員:</b> {row['定員']}<br>
+                <button onclick="
+                    var tooltipContent = `{row['法人の名称']}<br>{row['事業所の名称']}<br>{row['事業所住所（市区町村）']}{row['事業所住所（番地以降）']}<br>{row['サービス種別']}<br>定員: {row['定員']}`;
+                    var lat = {row['事業所緯度']};
+                    var lon = {row['事業所経度']};
+                    var mapLink = `https://www.google.com/maps/search/?api=1&query={row['事業所緯度']},{row['事業所経度']}`;
+
+                    window.parent.postMessage({{
+                        type: 'streamlit:setComponentValue',
+                        key: 'map_click_info',
+                        value: {{
+                            tooltip: tooltipContent,
+                            lat: lat,
+                            lon: lon,
+                            mapLink: mapLink
+                        }}
+                    }}, '*');
+                    window.open(mapLink, '_blank');
+                ">Googleマップで開く</button>
+                """
                 folium.CircleMarker(
-                    location=[row['lat'], row['lon']],
-                    radius=radius,
+                    location=[row['事業所緯度'], row['事業所経度']],
+                    radius=8,
                     color='red',
-                    weight=0.5,
+                    weight=2,
                     fill=True,
-                    fill_color=color_hex,
-                    fill_opacity=0.7,
-                    tooltip=f"{row['School_Name']}<br>児童生徒数 {row['Student_Count']}人<br>特別支援学級人数 {row['Special_Support_Class_Size']}人"
+                    fill_color='red',
+                    fill_opacity=0.6,
+                    tooltip=folium.Tooltip(f"{row['事業所の名称']}"),
+                    popup=folium.Popup(popup_html, max_width=300)
                 ).add_to(m)
+    else:
+        if selected_prefecture != 'なし' and ('なし' not in selected_service_types):
+            st.info("選択された条件に合致する事業所情報がないため、地図には表示されません。")
 
-        if not df_sfkopendata_filtered.empty:
-            for idx, row in df_sfkopendata_filtered.iterrows():
-                if pd.notna(row['事業所緯度']) and pd.notna(row['事業所経度']):
-                    popup_html = f"""
-                    <b>法人名:</b> {row['法人の名称']}<br>
-                    <b>事業所名:</b> {row['事業所の名称']}<br>
-                    <b>サービス種別:</b> {row['サービス種別']}<br>
-                    <b>住所:</b> {row['事業所住所（市区町村）']}{row['事業所住所（番地以降）']}<br>
-                    <b>定員:</b> {row['定員']}<br>
-                    <button onclick="
-                        var tooltipContent = `{row['法人の名称']}<br>{row['事業所の名称']}<br>{row['事業所住所（市区町村）']}{row['事業所住所（番地以降）']}<br>{row['サービス種別']}<br>定員: {row['定員']}`;
-                        var lat = {row['事業所緯度']};
-                        var lon = {row['事業所経度']};
-                        var mapLink = `https://www.google.com/maps/search/?api=1&query={row['事業所緯度']},{row['事業所経度']}`;
-
-                        window.parent.postMessage({{
-                            type: 'streamlit:setComponentValue',
-                            key: 'map_click_info',
-                            value: {{
-                                tooltip: tooltipContent,
-                                lat: lat,
-                                lon: lon,
-                                mapLink: mapLink
-                            }}
-                        }}, '*');
-                        window.open(mapLink, '_blank');
-                    ">Googleマップで開く</button>
-                    """
-                    folium.CircleMarker(
-                        location=[row['事業所緯度'], row['事業所経度']],
-                        radius=8,
-                        color='red',
-                        weight=2,
-                        fill=True,
-                        fill_color='red',
-                        fill_opacity=0.6,
-                        tooltip=folium.Tooltip(f"{row['事業所の名称']}"),
-                        popup=folium.Popup(popup_html, max_width=300)
-                    ).add_to(m)
+    map_data = st_folium(m, width=1024, height=768, returned_objects=['last_object_clicked'], key="folium_map")
+    
+    # 地図の下に凡例を表示
+    st.markdown("### 凡例")
+    if not df_map.empty:
+        st.markdown("""
+            <style>
+                .legend-item {
+                    display: flex;
+                    align-items: center;
+                    margin-bottom: 5px;
+                }
+                .color-box {
+                    width: 20px;
+                    height: 20px;
+                    margin-right: 10px;
+                    border: 1px solid #ccc;
+                }
+                .red-circle-box {
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 50%;
+                    background-color: red;
+                    border: 2px solid red;
+                    margin-right: 10px;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+    
+        min_students_for_legend = df_map['Student_Count'].min()
+        max_students_for_legend = df_map['Student_Count'].max()
+    
+        if (max_students_for_legend - min_students_for_legend) > 0:
+            num_steps = 5
+            legend_steps = np.linspace(min_students_for_legend, max_students_for_legend, num_steps)
+    
+            for i, count in enumerate(legend_steps):
+                current_color = get_color_for_students(count, min_students_for_legend, max_students_for_legend)
+                label = ""
+                if i == 0:
+                    label = f"{int(count)}人 (少ない)"
+                elif i == num_steps - 1:
+                    label = f"{int(count)}人 (多い)"
+                else:
+                    label = f"約 {int(count)}人"
+                st.markdown(f"""
+                    <div class="legend-item">
+                        <div class="color-box" style="background-color: {current_color};"></div>
+                        <span>{label}</span>
+                    </div>
+                """, unsafe_allow_html=True)
         else:
-            if selected_prefecture != 'なし' and ('なし' not in selected_service_types):
-                st.info("選択された条件に合致する事業所情報がないため、地図には表示されません。")
+            st.info(f"現在の選択では全学校の児童生徒数が一律 {int(min_students_for_legend)} 人のため、色の濃淡による凡例は表示されません。")
+    else:
+        st.info("地図凡例を表示するためのデータがありません。")
 
-
-        map_data = st_folium(m, width=1024, height=768, returned_objects=['last_object_clicked'], key="folium_map")
-
-    # with col2:
-        st.markdown("### 凡例")
-        if not df_map.empty:
-            st.markdown("""
-                <style>
-                    .legend-item {
-                        display: flex;
-                        align-items: center;
-                        margin-bottom: 5px;
-                    }
-                    .color-box {
-                        width: 20px;
-                        height: 20px;
-                        margin-right: 10px;
-                        border: 1px solid #ccc;
-                    }
-                    .red-circle-box {
-                        width: 20px;
-                        height: 20px;
-                        border-radius: 50%;
-                        background-color: red;
-                        border: 2px solid red;
-                        margin-right: 10px;
-                    }
-                </style>
-            """, unsafe_allow_html=True)
-
-            min_students_for_legend = df_map['Student_Count'].min()
-            max_students_for_legend = df_map['Student_Count'].max()
-
-            if (max_students_for_legend - min_students_for_legend) > 0:
-                num_steps = 5
-                legend_steps = np.linspace(min_students_for_legend, max_students_for_legend, num_steps)
-
-                for i, count in enumerate(legend_steps):
-                    current_color = get_color_for_students(count, min_students_for_legend, max_students_for_legend)
-                    label = ""
-                    if i == 0:
-                        label = f"{int(count)}人 (少ない)"
-                    elif i == num_steps - 1:
-                        label = f"{int(count)}人 (多い)"
-                    else:
-                        label = f"約 {int(count)}人"
-
-                    st.markdown(f"""
-                        <div class="legend-item">
-                            <div class="color-box" style="background-color: {current_color};"></div>
-                            <span>{label}</span>
-                        </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.info(f"現在の選択では全学校の児童生徒数が一律 {int(min_students_for_legend)} 人のため、色の濃淡による凡例は表示されません。")
-        else:
-            st.info("地図凡例を表示するためのデータがありません。")
-
-        if selected_prefecture != 'なし':
-            st.markdown("""
-                <div class="legend-item">
-                    <div class="red-circle-box"></div>
-                    <span>事業所(2025年3月末時点)</span>
-                </div>
-            """, unsafe_allow_html=True)
+if selected_prefecture != 'なし':
+    st.markdown("""
+        <div class="legend-item">
+            <div class="red-circle-box"></div>
+            <span>事業所(2025年3月末時点)</span>
+        </div>
+    """, unsafe_allow_html=True)
 
 
     # --- 4. 児童生徒数推移グラフ ---
