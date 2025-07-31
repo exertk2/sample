@@ -711,7 +711,7 @@ if st.session_state.current_view == 'map_view':
         st.markdown('凡例')
         # 学校の凡例
         if not df_map.empty:
-            st.markdown('<div class="legend-item"><div class="blue-circle-box"></div><span>学校: 児童生徒数 濃いほど大人数</span></div>', unsafe_allow_html=True)
+            st.markdown('<div class="legend-item"><div class="blue-circle-box"></div><span>学校: 児童生徒数 濃:多、淡:少</span></div>', unsafe_allow_html=True)
         else:
             st.info("地図凡例を表示するための学校データがありません。")
 
