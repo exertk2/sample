@@ -10,7 +10,7 @@ import os
 import time
 
 st.set_page_config(page_title="鹿児島 児童生徒数、障害事業所", layout="wide")
-st.info("免責事項:本アプリケーションの利用により生じたいかなる種類の損害、損失、不利益に対しても、開発者は一切の責任を負いません。本アプリケーションは現状有姿で提供され、開発者はその完全性、正確性、信頼性、特定の目的への適合性について、いかなる保証も行いません。利用者は、本アプリケーションの利用から生じる可能性のあるすべてのリスクを認識し、自己の責任において利用するものとします。")
+
 
 # --- データベースの作成とデータ投入関数 ---
 def create_and_populate_db(db_name='school_data.db'):
@@ -608,11 +608,11 @@ if st.session_state.current_view == 'map_view':
         df_sfkopendata_filtered = df_sfkopendata_filtered[0:0]
 
 
-    # --- 3. 地図と凡例 ---
+    # --- 3. 地図の表示 ---
     df_map = df_filtered[['School_Name', 'Student_Count', 'Special_Support_Class_Size', 'lat', 'lon']]
 
     map_center = [31.5960, 130.5580]
-    m = folium.Map(location=map_center, zoom_start=9)
+    m = folium.Map(location=map_center, zoom_start=10)
 
     if not df_map.empty:
         min_students = df_map['Student_Count'].min()
@@ -627,7 +627,7 @@ if st.session_state.current_view == 'map_view':
             folium.CircleMarker(
                 location=[row['lat'], row['lon']],
                 radius=radius,
-                color='red',
+                color='blue', # Changed to blue for schools to distinguish from red for businesses
                 weight=0.5,
                 fill=True,
                 fill_color=color_hex,
@@ -645,21 +645,7 @@ if st.session_state.current_view == 'map_view':
                 <b>住所:</b> {row['事業所住所（市区町村）']}{row['事業所住所（番地以降）']}<br>
                 <b>定員:</b> {row['定員']}<br>
                 <button onclick="
-                    var tooltipContent = `{row['法人の名称']}<br>{row['事業所の名称']}<br>{row['事業所住所（市区町村）']}{row['事業所住所（番地以降）']}<br>{row['サービス種別']}<br>定員: {row['定員']}`;
-                    var lat = {row['事業所緯度']};
-                    var lon = {row['事業所経度']};
                     var mapLink = `https://www.google.com/maps/search/?api=1&query={row['事業所緯度']},{row['事業所経度']}`;
-
-                    window.parent.postMessage({{
-                        type: 'streamlit:setComponentValue',
-                        key: 'map_click_info',
-                        value: {{
-                            tooltip: tooltipContent,
-                            lat: lat,
-                            lon: lon,
-                            mapLink: mapLink
-                        }}
-                    }}, '*');
                     window.open(mapLink, '_blank');
                 ">Googleマップで開く</button>
                 """
@@ -678,69 +664,66 @@ if st.session_state.current_view == 'map_view':
         if selected_prefecture != 'なし' and ('なし' not in selected_service_types):
             st.info("選択された条件に合致する事業所情報がないため、地図には表示されません。")
 
-    map_data = st_folium(m, width=1024, height=768, returned_objects=['last_object_clicked'], key="folium_map")
-    
-    # 地図の下に凡例を表示
-    st.markdown("### 凡例")
-    if not df_map.empty:
-        st.markdown("""
-            <style>
-                .legend-item {
-                    display: flex;
-                    align-items: center;
-                    margin-bottom: 5px;
-                }
-                .color-box {
-                    width: 20px;
-                    height: 20px;
-                    margin-right: 10px;
-                    border: 1px solid #ccc;
-                }
-                .red-circle-box {
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 50%;
-                    background-color: red;
-                    border: 2px solid red;
-                    margin-right: 10px;
-                }
-            </style>
-        """, unsafe_allow_html=True)
-    
-        min_students_for_legend = df_map['Student_Count'].min()
-        max_students_for_legend = df_map['Student_Count'].max()
-    
-        if (max_students_for_legend - min_students_for_legend) > 0:
-            num_steps = 5
-            legend_steps = np.linspace(min_students_for_legend, max_students_for_legend, num_steps)
-    
-            for i, count in enumerate(legend_steps):
-                current_color = get_color_for_students(count, min_students_for_legend, max_students_for_legend)
-                label = ""
-                if i == 0:
-                    label = f"{int(count)}人 (少ない)"
-                elif i == num_steps - 1:
-                    label = f"{int(count)}人 (多い)"
-                else:
-                    label = f"約 {int(count)}人"
-                st.markdown(f"""
-                    <div class="legend-item">
-                        <div class="color-box" style="background-color: {current_color};"></div>
-                        <span>{label}</span>
-                    </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info(f"現在の選択では全学校の児童生徒数が一律 {int(min_students_for_legend)} 人のため、色の濃淡による凡例は表示されません。")
-    else:
-        st.info("地図凡例を表示するためのデータがありません。")
+    st_folium(m, width=1366, height=768, returned_objects=[], key="folium_map")
 
-if selected_prefecture != 'なし':
+    # --- 凡例の表示 (地図の下に横並びで) ---
     st.markdown("""
-        <div class="legend-item">
-            <div class="red-circle-box"></div>
-            <span>事業所(2025年3月末時点)</span>
-        </div>
+        <style>
+            .legend-container {
+                display: flex;
+                flex-wrap: wrap; /* Allow items to wrap to the next line */
+                gap: 20px; /* Space between legend items */
+                margin-top: 0px;
+                margin-bottom: 0px;
+            }
+            .legend-item {
+                display: flex;
+                align-items: center;
+            }
+            .color-box {
+                width: 20px;
+                height: 20px;
+                margin-right: 10px;
+                border: 1px solid #ccc;
+                border-radius: 50%; /* Make school markers round */
+            }
+            .red-circle-box {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background-color: red;
+                border: 2px solid red;
+                margin-right: 10px;
+            }
+            .blue-circle-box {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background-color: blue; /* Changed to blue for schools */
+                border: 2px solid blue;
+                margin-right: 10px;
+            }
+        </style>
     """, unsafe_allow_html=True)
+
+    with st.container():
+        st.markdown('<div class="legend-container">', unsafe_allow_html=True)
+        st.markdown('凡例')
+        # 学校の凡例
+        if not df_map.empty:
+            st.markdown('<div class="legend-item"><div class="blue-circle-box"></div><span>学校: 児童生徒数 濃いほど大人数</span></div>', unsafe_allow_html=True)
+        else:
+            st.info("地図凡例を表示するための学校データがありません。")
+
+        # 事業所の凡例
+        if selected_prefecture != 'なし' and ('なし' not in selected_service_types):
+            st.markdown("""
+                <div class="legend-item">
+                    <div class="red-circle-box"></div>
+                    <span>事業所(2025年3月末時点)</span>
+                </div>
+            """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
     # --- 4. 児童生徒数推移グラフ ---
@@ -825,3 +808,6 @@ if selected_prefecture != 'なし':
 
 elif st.session_state.current_view == 'edit_view':
     edit_coordinates_screen(df_school)
+
+# --- Disclaimer (moved to the very bottom) ---
+st.info("免責事項:本アプリケーションの利用により生じたいかなる種類の損害、損失、不利益に対しても、開発者は一切の責任を負いません。本アプリケーションは現状有姿で提供され、開発者はその完全性、正確性、信頼性、特定の目的への適合性について、いかなる保証も行いません。利用者は、本アプリケーションの利用から生じる可能性のあるすべてのリスクを認識し、自己の責任において利用するものとします。")
