@@ -683,45 +683,45 @@ if st.session_state.current_view == 'map_view':
 # 地図の下に凡例を表示
 st.markdown("### 凡例")
 if not df_map.empty:
-st.markdown("""
-    <style>
-        .legend-row {
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin-right: 25px;  /* 横に間隔を作る */
-        }
-        .color-box, .red-circle-box {
-            width: 20px;
-            height: 20px;
-            margin-right: 5px;
-            border: 1px solid #ccc;
-        }
-        .red-circle-box {
-            border-radius: 50%;
-            background-color: red;
-            border: 2px solid red;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-# 凡例の内容を横並びでdiv.legend-row内に記述
-st.markdown('<div class="legend-row">', unsafe_allow_html=True)
-for i, count in enumerate(legend_steps):
-    current_color = get_color_for_students(count, min_students_for_legend, max_students_for_legend)
-    label = ...
-    st.markdown(f'''
-        <div class="legend-item">
-            <div class="color-box" style="background-color: {current_color};"></div>
-            <span>{label}</span>
-        </div>
-    ''', unsafe_allow_html=True)
-st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("""
+        <style>
+            .legend-row {
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                margin-bottom: 10px;
+            }
+            .legend-item {
+                display: flex;
+                align-items: center;
+                margin-right: 25px;  /* 横に間隔を作る */
+            }
+            .color-box, .red-circle-box {
+                width: 20px;
+                height: 20px;
+                margin-right: 5px;
+                border: 1px solid #ccc;
+            }
+            .red-circle-box {
+                border-radius: 50%;
+                background-color: red;
+                border: 2px solid red;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # 凡例の内容を横並びでdiv.legend-row内に記述
+    st.markdown('<div class="legend-row">', unsafe_allow_html=True)
+    for i, count in enumerate(legend_steps):
+        current_color = get_color_for_students(count, min_students_for_legend, max_students_for_legend)
+        label = ...
+        st.markdown(f'''
+            <div class="legend-item">
+                <div class="color-box" style="background-color: {current_color};"></div>
+                <span>{label}</span>
+            </div>
+        ''', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     min_students_for_legend = df_map['Student_Count'].min()
     max_students_for_legend = df_map['Student_Count'].max()
