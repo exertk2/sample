@@ -609,9 +609,9 @@ if st.session_state.current_view == 'map_view':
 
 
     # --- 3. 地図と凡例の表示を横に並べる ---
-    col1, col2 = st.columns([3, 1])
+    # col1, col2 = st.columns([3, 1])
 
-    with col1:
+    # with col1:
         df_map = df_filtered[['School_Name', 'Student_Count', 'Special_Support_Class_Size', 'lat', 'lon']]
 
         map_center = [31.5960, 130.5580]
@@ -684,27 +684,7 @@ if st.session_state.current_view == 'map_view':
 
         map_data = st_folium(m, width=1024, height=768, returned_objects=['last_object_clicked'], key="folium_map")
 
-        # if map_data and map_data.get('last_object_clicked'):
-        #     clicked_obj = map_data['last_object_clicked']
-        #     if clicked_obj and clicked_obj.get('lat') is not None and clicked_obj.get('lng') is not None:
-        #         st.session_state['clicked_lat'] = clicked_obj['lat']
-        #         st.session_state['clicked_lon'] = clicked_obj['lng']
-        #         st.markdown(f"### クリックされた事業所情報")
-        #         st.markdown(f"**緯度:** {st.session_state['clicked_lat']:.4f}, **経度:** {st.session_state['clicked_lon']:.4f}")
-        #         google_maps_url = f"https://www.google.com/maps/search/?api=1&query={st.session_state['clicked_lat']},{st.session_state['clicked_lon']}"
-        #         st.markdown(f"[Googleマップで開く]({google_maps_url})", unsafe_allow_html=True)
-
-        # if 'map_click_info' in st.session_state:
-        #     info = st.session_state['map_click_info']
-        #     if info:
-        #         st.markdown(f"### クリックされた事業所情報")
-        #         st.markdown(f"**内容:** {info['tooltip']}", unsafe_allow_html=True)
-        #         st.markdown(f"**緯度:** {info['lat']:.4f}, **経度:** {info['lon']:.4f}")
-        #         st.markdown(f"[Googleマップで開く]({info['mapLink']})", unsafe_allow_html=True)
-        #         del st.session_state['map_click_info']
-
-
-    with col2:
+    # with col2:
         st.markdown("### 凡例")
         if not df_map.empty:
             st.markdown("""
