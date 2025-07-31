@@ -685,15 +685,21 @@ if st.session_state.current_view == 'map_view':
     if not df_map.empty:
         st.markdown("""
             <style>
+                .legend-row {
+                    display: flex;
+                    flex-direction: row;
+                    align-items: center;
+                    gap: 24px;
+                    margin-bottom: 16px;
+                }
                 .legend-item {
                     display: flex;
                     align-items: center;
-                    margin-bottom: 5px;
                 }
                 .color-box {
                     width: 20px;
                     height: 20px;
-                    margin-right: 10px;
+                    margin-right: 8px;
                     border: 1px solid #ccc;
                 }
                 .red-circle-box {
@@ -702,7 +708,7 @@ if st.session_state.current_view == 'map_view':
                     border-radius: 50%;
                     background-color: red;
                     border: 2px solid red;
-                    margin-right: 10px;
+                    margin-right: 8px;
                 }
             </style>
         """, unsafe_allow_html=True)
@@ -714,6 +720,7 @@ if st.session_state.current_view == 'map_view':
             num_steps = 5
             legend_steps = np.linspace(min_students_for_legend, max_students_for_legend, num_steps)
     
+            legend_html = '<div class="legend-row">'
             for i, count in enumerate(legend_steps):
                 current_color = get_color_for_students(count, min_students_for_legend, max_students_for_legend)
                 label = ""
@@ -723,24 +730,29 @@ if st.session_state.current_view == 'map_view':
                     label = f"{int(count)}人 (多い)"
                 else:
                     label = f"約 {int(count)}人"
-                st.markdown(f"""
+                legend_html += f"""
                     <div class="legend-item">
                         <div class="color-box" style="background-color: {current_color};"></div>
                         <span>{label}</span>
                     </div>
-                """, unsafe_allow_html=True)
+                """
+            legend_html += '</div>'
+            st.markdown(legend_html, unsafe_allow_html=True)
         else:
             st.info(f"現在の選択では全学校の児童生徒数が一律 {int(min_students_for_legend)} 人のため、色の濃淡による凡例は表示されません。")
     else:
         st.info("地図凡例を表示するためのデータがありません。")
-
-if selected_prefecture != 'なし':
-    st.markdown("""
-        <div class="legend-item">
-            <div class="red-circle-box"></div>
-            <span>事業所(2025年3月末時点)</span>
-        </div>
-    """, unsafe_allow_html=True)
+    
+    # 事業所アイコンの凡例も横並びに
+    if selected_prefecture != 'なし':
+        st.markdown("""
+            <div class="legend-row">
+                <div class="legend-item">
+                    <div class="red-circle-box"></div>
+                    <span>事業所(2025年3月末時点)</span>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
 
     # --- 4. 児童生徒数推移グラフ ---
