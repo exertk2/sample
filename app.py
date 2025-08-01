@@ -657,7 +657,7 @@ if st.session_state.current_view == 'map_view':
                     fill=True,
                     fill_color='red',
                     fill_opacity=0.6,
-                    tooltip=folium.Tooltip(f"{row['事業所の名称']}<br>{row['サービス種別']}"),
+                    tooltip=folium.Tooltip(f"{row['事業所の名称']}<br>({row['サービス種別']})"),
                     popup=folium.Popup(popup_html, max_width=300)
                 ).add_to(m)
     else:
