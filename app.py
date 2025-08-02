@@ -538,7 +538,7 @@ if st.session_state.current_view == 'map_view':
         '41': '佐賀県', '42': '長崎県', '43': '熊本県', '44': '大分県', '45': '宮崎県',
         '46': '鹿児島県', '47': '沖縄県'
     }
-    prefecture_options = ['なし'] + ['すべて'] + [f"{code}: {name}" for code, name in prefecture_codes.items()]
+    prefecture_options = ['すべて'] + [f"{code}: {name}" for code, name in prefecture_codes.items()]
 
     kagoshima_pref_label = "46: 鹿児島県"
     default_kagoshima_index = prefecture_options.index(kagoshima_pref_label) if kagoshima_pref_label in prefecture_options else 0
@@ -551,11 +551,13 @@ if st.session_state.current_view == 'map_view':
     )
 
     unique_service_types = df_sfkopendata['サービス種別'].unique().tolist()
-    service_type_options = ['なし'] + ['すべて'] + unique_service_types
+    # 「すべて」とユニークなサービス種別のリストを作成
+    service_type_options = ['すべて'] + unique_service_types
+    # デフォルトを空リストに変更
     selected_service_types = st.sidebar.multiselect(
         'サービス種別を選択',
         options=service_type_options,
-        default=['なし'],
+        default=[],
         key='map_service_types'
     )
 
@@ -585,26 +587,21 @@ if st.session_state.current_view == 'map_view':
     # --- sfkopendataのフィルター適用 ---
     df_sfkopendata_filtered = df_sfkopendata.copy()
 
-    if selected_prefecture == 'なし':
-        df_sfkopendata_filtered = df_sfkopendata_filtered[0:0]
-    elif selected_prefecture != 'すべて':
+    if selected_prefecture != 'すべて':
         pref_code = selected_prefecture.split(':')[0]
         df_sfkopendata_filtered = df_sfkopendata_filtered[
             df_sfkopendata_filtered['都道府県コード又は市区町村コード'].str[:2] == pref_code
         ]
 
     if selected_service_types:
-        if 'なし' in selected_service_types:
-            df_sfkopendata_filtered = df_sfkopendata_filtered[0:0]
-        elif 'すべて' in selected_service_types and len(selected_service_types) == 1:
+        if 'すべて' in selected_service_types:
+            # 「すべて」が選択された場合、他のフィルタは無視
             pass
         else:
-            filter_types = [s for s in selected_service_types if s != 'すべて']
-            if filter_types:
-                df_sfkopendata_filtered = df_sfkopendata_filtered[df_sfkopendata_filtered['サービス種別'].isin(filter_types)]
-            else:
-                df_sfkopendata_filtered = df_sfkopendata_filtered[0:0]
+            # 選択されたサービス種別でフィルタ
+            df_sfkopendata_filtered = df_sfkopendata_filtered[df_sfkopendata_filtered['サービス種別'].isin(selected_service_types)]
     else:
+        # サービス種別が何も選択されていない場合、データフレームを空にする
         df_sfkopendata_filtered = df_sfkopendata_filtered[0:0]
 
 
@@ -635,7 +632,25 @@ if st.session_state.current_view == 'map_view':
                 tooltip=f"{row['School_Name']}<br>児童生徒数 {row['Student_Count']}人<br>特別支援学級人数 {row['Special_Support_Class_Size']}人"
             ).add_to(m)
 
-    if not df_sfkopendata_filtered.empty:
+    # サービス種別ごとに異なる色を生成する
+    if not df_sfkopendata_filtered.empty and selected_service_types:
+        if 'すべて' in selected_service_types and len(selected_service_types) == 1:
+            # 「すべて」が選択されている場合は一律の赤色
+            service_colors = {'すべて': '#e60000'}
+            legend_items = [('すべて', '#e60000')]
+        else:
+            # 複数選択されている場合、濃淡を付ける
+            unique_selected_service_types = [st for st in selected_service_types if st != 'すべて']
+            num_selected = len(unique_selected_service_types)
+            # HSVで色を生成してRGBに変換する
+            hsv_colors = [(0, 1 - (i / max(1, num_selected-1)) * 0.5, 1) for i in range(num_selected)] # 0から0.5の範囲で彩度を変化
+            # color_map = {name: color for name, color in zip(unique_selected_service_types, hsv_colors)} # このままでは使えない
+            # 濃淡のRGB値を計算
+            rgb_values = [(int(255 * (1 - i / max(1, num_selected))), 0, 0) for i in range(num_selected)]
+            hex_colors = [f'#{r:02x}{g:02x}{b:02x}' for r, g, b in rgb_values]
+            service_colors = {name: hex_colors[i] for i, name in enumerate(unique_selected_service_types)}
+            legend_items = [(name, service_colors[name]) for name in unique_selected_service_types]
+
         for idx, row in df_sfkopendata_filtered.iterrows():
             if pd.notna(row['事業所緯度']) and pd.notna(row['事業所経度']):
                 popup_html = f"""
@@ -649,21 +664,23 @@ if st.session_state.current_view == 'map_view':
                     window.open(mapLink, '_blank');
                 ">Googleマップで開く</button>
                 """
+                # サービス種別ごとの色を適用
+                service_type = row['サービス種別']
+                color_to_use = service_colors.get(service_type, '#ff0000') # 該当する色がなければデフォルトの赤色
+
                 folium.CircleMarker(
                     location=[row['事業所緯度'], row['事業所経度']],
                     radius=8,
-                    color='red',
+                    color=color_to_use,
                     weight=2,
                     fill=True,
-                    fill_color='red',
+                    fill_color=color_to_use,
                     fill_opacity=0.6,
                     tooltip=folium.Tooltip(f"{row['事業所の名称']}<br>({row['サービス種別']})"),
                     popup=folium.Popup(popup_html, max_width=300)
                 ).add_to(m)
-    else:
-        if selected_prefecture != 'なし' and ('なし' not in selected_service_types):
-            st.info("選択された条件に合致する事業所情報がないため、地図には表示されません。")
-
+    elif selected_prefecture != 'すべて' and selected_prefecture != 'なし':
+        st.info("選択された条件に合致する事業所情報がないため、地図には表示されません。")
     st_folium(m, width=1366, height=768, returned_objects=[], key="folium_map")
 
     # --- 凡例の表示 (地図の下に横並びで) ---
@@ -716,13 +733,17 @@ if st.session_state.current_view == 'map_view':
             st.info("地図凡例を表示するための学校データがありません。")
 
         # 事業所の凡例
-        if selected_prefecture != 'なし' and ('なし' not in selected_service_types):
-            st.markdown("""
-                <div class="legend-item">
-                    <div class="red-circle-box"></div>
-                    <span>事業所(2025年3月末時点)</span>
-                </div>
-            """, unsafe_allow_html=True)
+        if selected_service_types:
+            for service_type, color in legend_items:
+                st.markdown(f"""
+                    <div class="legend-item">
+                        <div class="color-box" style="background-color: {color}; border-color: {color};"></div>
+                        <span>{service_type}</span>
+                    </div>
+                """, unsafe_allow_html=True)
+        elif selected_prefecture != 'すべて' and selected_prefecture != 'なし':
+            st.info("選択された条件に合致する事業所情報がないため、地図には表示されません。")
+
         st.markdown('</div>', unsafe_allow_html=True)
 
 
