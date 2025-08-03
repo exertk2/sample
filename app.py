@@ -663,6 +663,11 @@ if st.session_state.current_view == 'map_view':
                     var mapLink = `https://www.google.com/maps/search/?api=1&query={row['事業所緯度']},{row['事業所経度']}`;
                     window.open(mapLink, '_blank');
                 ">Googleマップで開く</button>
+                <br>
+                <button onclick="
+                    var mapLink = {row['事業所URL']};
+                    window.open(mapLink, '_blank');
+                ">ホームページを開く</button>
                 """
                 # サービス種別ごとの色を適用
                 service_type = row['サービス種別']
