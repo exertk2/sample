@@ -664,7 +664,6 @@ if st.session_state.current_view == 'map_view':
                     window.open(mapLink, '_blank');
                 ">Googleマップで開く</button>
                 <br>
-                <br>
                 <button onclick="
                     var mapLink2 = `{row['事業所URL']}`;
                     window.open(mapLink2, '_blank');
