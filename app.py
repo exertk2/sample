@@ -676,7 +676,7 @@ if st.session_state.current_view == 'map_view':
                     fill=True,
                     fill_color=color_to_use,
                     fill_opacity=0.6,
-                    tooltip=folium.Tooltip(f"{row['事業所の名称']}<br>({row['サービス種別']}:定員{row['定員']})"),
+                    tooltip=folium.Tooltip(f"{row['事業所の名称']}<br>({row['サービス種別']}:定員{row['定員']})<br>{row['事業所URL']}"),
                     popup=folium.Popup(popup_html, max_width=300)
                 ).add_to(m)
     elif selected_prefecture != 'すべて' and selected_prefecture != 'なし':
