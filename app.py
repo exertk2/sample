@@ -665,8 +665,8 @@ if st.session_state.current_view == 'map_view':
                 ">Googleマップで開く</button>
                 <br>
                 <button onclick="
-                    var mapLink = {row['事業所URL']};
-                    window.open(mapLink, '_blank');
+                    var mapLink2 = {row['事業所URL']};
+                    window.open(mapLink2, '_blank');
                 ">ホームページを開く</button>
                 """
                 # サービス種別ごとの色を適用
