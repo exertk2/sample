@@ -76,7 +76,7 @@ if not st.session_state['authenticated']:
         if password_input == PASSWORD:
             st.session_state['authenticated'] = True
             st.success("ログインに成功しました！")
-            st.experimental_rerun()
+            st.rerun
         else:
             st.error("パスワードが間違っています。")
 
