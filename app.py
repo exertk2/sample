@@ -4,7 +4,7 @@ import pandas as pd
 import os
 
 # ★ アプリケーション起動時のパスワード認証
-PASSWORD = "your_password_here" # ★ ここを実際のパスワードに変更してください
+PASSWORD = "1" # ★ ここを実際のパスワードに変更してください
 
 # --------------------
 # データベースの初期化
