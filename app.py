@@ -174,3 +174,4 @@ else:
                         st.experimental_rerun()
         else:
             st.info("登録されているデータはありません。")
+
